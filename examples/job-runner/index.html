@@ -1,0 +1,1859 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GPU job runner</title>
+<script>
+  /* Apply the theme before first paint: stored light|dark, else the system setting. */
+  (function () {
+    var p = "system";
+    try { p = localStorage.getItem("gpurunner.theme") || "system"; } catch (e) {}
+    var d = p === "dark" || (p === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    document.documentElement.classList.toggle("dark", d);
+    document.documentElement.style.colorScheme = d ? "dark" : "light";
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/vue@3.5.13/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/iconify-icon@2.1.0/dist/iconify-icon.min.js"></script>
+<style>
+/*
+ * Kohaku design tokens — framework-agnostic CSS variables.
+ *
+ * Source of truth for the "gemstone on warm stone" language used across
+ * KohakuTerrarium, Togeari, KohakuNodeIR, TerrariumMarket, Kohaku-Docs.
+ * Values are the KohakuTerrarium / Togeari canonical set (Nov 2026).
+ *
+ * Rules baked in here:
+ *  - Seven gems, each with exactly three shades: light / DEFAULT / shadow.
+ *    No 100-900 scale for gems; no "-dark"/"-deep" shades. Warm is the only
+ *    neutral and the only full ramp.
+ *  - Light mode = "stone frame": the frame (rail, strip) is darker than a
+ *    near-white canvas. Dark mode lifts each surface level lighter and drops
+ *    card shadows.
+ *  - Never cool slate/zinc greys. Never stock Tailwind hues.
+ *
+ * Usage: import once at the app root, toggle dark mode with `html.dark`.
+ */
+
+:root {
+  /* ── Gems (light / DEFAULT / shadow) ─────────────────────────── */
+  --kt-color-sapphire-light: #d6e3f8;
+  --kt-color-sapphire: #0f52ba;
+  --kt-color-sapphire-shadow: #082567;
+  --kt-color-aquamarine-light: #d4ede8;
+  --kt-color-aquamarine: #4c9989;
+  --kt-color-aquamarine-shadow: #1b6b5a;
+  --kt-color-taaffeite-light: #e8d5ed;
+  --kt-color-taaffeite: #a57eae;
+  --kt-color-taaffeite-shadow: #6b4670;
+  --kt-color-iolite-light: #ddd0f0;
+  --kt-color-iolite: #5a4fcf;
+  --kt-color-iolite-shadow: #312a7a;
+  --kt-color-amber-light: #f5e6c8;
+  --kt-color-amber: #d4920a;
+  --kt-color-amber-shadow: #8b5e00;
+  --kt-color-coral-light: #f5d5d5;
+  --kt-color-coral: #d46b6b;
+  --kt-color-coral-shadow: #8b3a3a;
+  --kt-color-sage-light: #d5e8da;
+  --kt-color-sage: #5a9e6f;
+  --kt-color-sage-shadow: #3a6b48;
+
+  /* ── Warm neutral ramp (the only grey) ───────────────────────── */
+  --kt-color-warm-50: #f7f5f2;
+  --kt-color-warm-100: #efece7;
+  --kt-color-warm-200: #e0dbd4;
+  --kt-color-warm-300: #c5bfb7;
+  --kt-color-warm-400: #a09a92;
+  --kt-color-warm-500: #8a8480;
+  --kt-color-warm-600: #6a645f;
+  --kt-color-warm-700: #4a4540;
+  --kt-color-warm-800: #3a3632;
+  --kt-color-warm-900: #2a2724;
+  --kt-color-warm-950: #1a1816;
+
+  /* ── Semantic roles (pick by meaning, never by look) ─────────── */
+  --kt-accent: var(--kt-color-iolite);          /* primary, focus, selection, links */
+  --kt-accent-text: var(--kt-color-iolite);
+  --kt-live: var(--kt-color-aquamarine);        /* running, connected, alive */
+  --kt-ok: var(--kt-color-sage);                /* done, success, passed */
+  --kt-attention: var(--kt-color-amber);        /* waiting on you, warning, edit mode */
+  --kt-danger: var(--kt-color-coral);           /* error, destructive */
+  --kt-info: var(--kt-color-sapphire);          /* tool, informational, magnitude/heat */
+  --kt-entity: var(--kt-color-taaffeite);       /* secondary entity: sub-agent, category */
+  --kt-neutral: var(--kt-color-warm-400);       /* stopped, idle-unknown, metadata */
+
+  /* Text on a tinted/light background uses the -shadow shade (light mode). */
+  --kt-ok-text: var(--kt-color-sage-shadow);
+  --kt-live-text: var(--kt-color-aquamarine-shadow);
+  --kt-attention-text: var(--kt-color-amber-shadow);
+  --kt-danger-text: var(--kt-color-coral);      /* coral DEFAULT is legible as text */
+
+  /* ── Base surfaces: "stone" light ────────────────────────────── */
+  --color-bg: #f2eee8;
+  --color-surface: #ffffff;
+  --color-surface-alt: #efebe5;
+  --color-border: #e5dfd7;
+  --color-text: #2e2a26;
+  --color-text-muted: #6c655d;
+  --color-text-faint: #8f8880;
+
+  /* ── v2 five-level surfaces (app shells) ─────────────────────── */
+  --v2-rail: #dcd5cb;        /* darkest frame: nav rail */
+  --v2-chrome: #e3ddd5;      /* tab strip / app header */
+  --v2-canvas: #fbfaf8;      /* what a tab shows; the active tab uses this */
+  --v2-panel: #f2eee8;       /* side regions, always edged by --v2-line-strong */
+  --v2-card: #ffffff;        /* grouped content on a canvas */
+  --v2-card-shadow: 0 1px 2px rgb(40 34 28 / 0.05);
+  --v2-float: #ffffff;       /* menus, popovers, docks — above the page */
+  --v2-float-shadow: 0 6px 20px rgb(30 24 18 / 0.14);
+  --v2-line: #e5dfd7;        /* rows inside a region */
+  --v2-line-strong: #cdc5ba; /* region boundaries */
+  --v2-hover: rgb(36 33 29 / 0.07);
+  --v2-ink: #24211d;         /* reading text: near-black */
+  --v2-ink-2: #6c655d;
+  --v2-ink-3: #8f8880;
+
+  /* ── Typography ──────────────────────────────────────────────── */
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "PingFang TC",
+    "Microsoft JhengHei", sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, "Cascadia Code", Consolas, monospace;
+
+  /* Semantic size tiers — name by what the text DOES. App-shell density. */
+  --kt-fs-micro: 0.65rem;    /* badge counters, superscripts */
+  --kt-fs-caption: 0.75rem;  /* section labels, tab labels, hints */
+  --kt-fs-body: 0.875rem;    /* default body, rail items, header titles */
+  --kt-fs-emphasis: 1rem;    /* prominent body */
+  --kt-fs-title: 1.125rem;   /* card title */
+  --kt-fs-h2: 1.25rem;
+  --kt-fs-h1: 1.5rem;
+
+  /* ── Shape & motion ──────────────────────────────────────────── */
+  --kt-radius-control: 0.5rem;  /* buttons, inputs (rounded-lg) */
+  --kt-radius-card: 0.75rem;    /* cards, panels, dialogs (rounded-xl) */
+  --kt-radius-pill: 9999px;     /* chips, badges */
+  --kt-ease: ease;
+  --kt-dur-fast: 0.15s;         /* colour / opacity / chevron */
+  --kt-dur: 0.2s;               /* fade / slide transitions */
+
+  /* ── Data viz (tuned per mode; validated for colour-vision deficiency) ── */
+  --kt-chart-cat-1: #5a4fcf;
+  --kt-chart-cat-2: #1f9a80;
+  --kt-chart-good: #3a8a55;
+  --kt-chart-warn: #b87a00;
+  --kt-chart-bad: #c24a4a;
+  --kt-chart-idle: #a09a92;
+  --kt-chart-axis: #77706a;
+  --kt-chart-grid: rgb(36 33 29 / 0.07);
+}
+
+/* Reading surfaces (docs, articles): retune the tiers around a 16px body. */
+.kt-reading,
+html[data-kt-density="reading"] {
+  --kt-fs-micro: 0.75rem;
+  --kt-fs-caption: 0.875rem;
+  --kt-fs-body: 1rem;
+  --kt-fs-emphasis: 1.125rem;
+  --kt-fs-title: 1.375rem;
+  --kt-fs-h2: 1.75rem;
+  --kt-fs-h1: 2.5rem;
+  --kt-measure: min(78ch, 100%);
+}
+
+/* Touch: bump every tier so chrome is readable without per-component overrides. */
+@media (pointer: coarse) {
+  :root {
+    --kt-fs-micro: 0.75rem;
+    --kt-fs-caption: 0.85rem;
+    --kt-fs-body: 1rem;
+    --kt-fs-emphasis: 1.05rem;
+    --kt-fs-title: 1.2rem;
+    --kt-fs-h2: 1.35rem;
+    --kt-fs-h1: 1.6rem;
+  }
+}
+
+html.dark {
+  /* In dark mode accents and text-on-tint switch to the -light shade. */
+  --kt-accent-text: var(--kt-color-iolite-light);
+  --kt-ok-text: var(--kt-color-sage-light);
+  --kt-live-text: var(--kt-color-aquamarine-light);
+  --kt-attention-text: var(--kt-color-amber-light);
+  --kt-danger-text: var(--kt-color-coral-light);
+
+  --color-bg: #1a1816;
+  --color-surface: #252220;
+  --color-surface-alt: #1e1c1a;
+  --color-border: #3d3835;
+  --color-text: #e8e0d8;
+  --color-text-muted: #8a8078;
+  --color-text-faint: #5a5550;
+
+  --v2-rail: #161412;
+  --v2-chrome: #1a1816;
+  --v2-canvas: #221f1d;
+  --v2-panel: #2a2724;
+  --v2-card: #2a2724;
+  --v2-card-shadow: none;
+  --v2-float: #2e2b28;
+  --v2-float-shadow: 0 6px 20px rgb(0 0 0 / 0.35);
+  --v2-line: #3a3632;
+  --v2-line-strong: #4a4540;
+  --v2-hover: rgb(255 255 255 / 0.05);
+  --v2-ink: #f3efe9;
+  --v2-ink-2: #a39a91;
+  --v2-ink-3: #6f6760;
+
+  --kt-chart-cat-1: #8076e6;
+  --kt-chart-cat-2: #25a88e;
+  --kt-chart-good: #6db585;
+  --kt-chart-warn: #d9a23a;
+  --kt-chart-bad: #e07a7a;
+  --kt-chart-idle: #6a645f;
+  --kt-chart-axis: #8a8078;
+  --kt-chart-grid: rgb(255 255 255 / 0.06);
+}
+/*
+ * Kohaku base layer — import AFTER tokens.css.
+ * Reset, page defaults, touch rules, surface classes, and plain-CSS
+ * component classes for projects that do not use UnoCSS/Tailwind.
+ * Every rule here exists because the author hit the bug it prevents;
+ * the comments say which.
+ */
+
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+button {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  appearance: none;
+}
+select,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+html {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  height: 100%;
+  /* Android "font boosting" inflated a narrow chat input to ~32-40px. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* One stray nowrap row must not make the whole page pan sideways;
+     scoped scrollers opt back in with overflow-x:auto. */
+  overflow-x: hidden;
+  /* Kill iOS double-tap zoom on chrome; pinch-zoom still works. */
+  touch-action: manipulation;
+}
+body {
+  height: 100%;
+  overflow-x: hidden;
+}
+
+code,
+pre,
+kbd,
+.font-mono,
+.num {
+  font-family: var(--font-mono);
+}
+/* Every figure that can change or be compared is tabular. */
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Thin warm scrollbars. */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Keyboard focus: always visible, iolite, never on mouse click. */
+:focus-visible {
+  outline: 2px solid var(--kt-accent);
+  outline-offset: 1px;
+}
+
+/* ── Size tiers as classes (use on chrome instead of text-[Npx]) ── */
+.kt-text-micro { font-size: var(--kt-fs-micro); }
+.kt-text-caption { font-size: var(--kt-fs-caption); }
+.kt-text-body { font-size: var(--kt-fs-body); }
+.kt-text-emphasis { font-size: var(--kt-fs-emphasis); }
+.kt-text-title { font-size: var(--kt-fs-title); }
+.kt-text-h2 { font-size: var(--kt-fs-h2); }
+.kt-text-h1 { font-size: var(--kt-fs-h1); }
+
+/* ── Touch ─────────────────────────────────────────────────────── */
+@media (pointer: coarse) {
+  /* iOS zooms the viewport on focus below 16px. max() lets a larger
+     reading size still grow the input past the floor. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  textarea,
+  select,
+  [contenteditable="true"] {
+    font-size: max(16px, 1rem) !important;
+  }
+}
+
+/* Hover-revealed actions: visible on hover OR keyboard focus, and ALWAYS
+   visible on touch (no hover there). Pair with a non-overlay layout so the
+   actions never sit on top of a neighbour's tap target. */
+.hover-only-action {
+  opacity: 0;
+  transition: opacity var(--kt-dur-fast) var(--kt-ease);
+}
+.group:hover .hover-only-action,
+.group:focus-within .hover-only-action {
+  opacity: 1;
+}
+@media (pointer: coarse) {
+  .hover-only-action {
+    opacity: 1;
+  }
+}
+
+/* ── Motion ────────────────────────────────────────────────────── */
+/* The only continuous animation allowed: an opacity pulse on things the
+   user genuinely wants to see moving (a "Processing…" line, a reconnect
+   banner). NEVER on repeated status dots — 10-30 animated dots kept the
+   GPU busy on an idle page and added no information. */
+@keyframes kt-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+.kohaku-pulse {
+  animation: kt-pulse 1.5s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── v2 surfaces ───────────────────────────────────────────────── */
+.kt-v2-rail { background: var(--v2-rail); }
+.kt-v2-chrome { background: var(--v2-chrome); }
+.kt-v2-canvas { background: var(--v2-canvas); }
+.kt-v2-panel { background: var(--v2-panel); }
+.kt-v2-card {
+  background: var(--v2-card);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--kt-radius-card);
+  box-shadow: var(--v2-card-shadow);
+}
+.kt-v2-float {
+  background: var(--v2-float);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--kt-radius-card);
+  box-shadow: var(--v2-float-shadow);
+}
+/* Line classes draw only on the sides you name (border-r etc.), so
+   width resets to 0 at zero specificity. */
+:where(.kt-v2-line, .kt-v2-edge) {
+  border-width: 0;
+  border-style: solid;
+}
+.kt-v2-line { border-color: var(--v2-line); }
+.kt-v2-edge { border-color: var(--v2-line-strong); }
+
+/* Fused tab: the active tab IS the canvas colour and the strip has no
+   bottom line under it, so tab and page read as one surface. */
+.kt-tab {
+  height: 2rem;
+  padding: 0 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: var(--kt-fs-caption);
+  color: var(--v2-ink-2);
+  border-radius: 0.625rem 0.625rem 0 0;
+  transition: background-color var(--kt-dur-fast) var(--kt-ease);
+}
+.kt-tab:hover { background: var(--v2-hover); }
+.kt-tab[aria-selected="true"],
+.kt-tab.is-active {
+  background: var(--v2-canvas);
+  color: var(--v2-ink);
+}
+
+/* ── Plain-CSS components (for projects without UnoCSS/Tailwind) ── */
+.kt-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  height: 2rem;
+  padding: 0 0.75rem;
+  border-radius: var(--kt-radius-control);
+  font-size: var(--kt-fs-body);
+  font-weight: 500;
+  white-space: nowrap;
+  user-select: none;
+  transition: background-color var(--kt-dur-fast), border-color var(--kt-dur-fast),
+    color var(--kt-dur-fast);
+}
+.kt-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.kt-btn--primary { background: var(--kt-color-iolite); color: #fff; }
+.kt-btn--primary:hover:not(:disabled) { background: var(--kt-color-iolite-shadow); }
+.kt-btn--danger { background: var(--kt-color-coral); color: #fff; }
+.kt-btn--danger:hover:not(:disabled) { background: var(--kt-color-coral-shadow); }
+/* Secondary hovers by tinting its border, not by filling. */
+.kt-btn--secondary {
+  background: var(--v2-panel);
+  border: 1px solid var(--v2-line-strong);
+  color: var(--color-text);
+}
+.kt-btn--secondary:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--kt-color-iolite) 50%, transparent);
+}
+.kt-btn--ghost { color: var(--kt-color-warm-600); }
+.kt-btn--ghost:hover:not(:disabled) { background: var(--v2-hover); }
+.kt-btn--icon { width: 2rem; padding: 0; color: var(--kt-color-warm-600); }
+.kt-btn--icon:hover:not(:disabled) { background: var(--v2-hover); color: var(--color-text); }
+html.dark .kt-btn--ghost,
+html.dark .kt-btn--icon { color: var(--kt-color-warm-400); }
+@media (pointer: coarse) {
+  .kt-btn { min-height: 2.5rem; }
+  .kt-btn--icon { min-width: 2.5rem; }
+}
+
+/* Chip: gem at 10% fill, 40% border; -shadow text (light) / -light text (dark).
+   Set --gem / --gem-text / --gem-text-dark on the element or use a modifier. */
+.kt-chip {
+  --gem: var(--kt-color-warm-500);
+  --gem-text: var(--kt-color-warm-700);
+  --gem-text-dark: var(--kt-color-warm-200);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.375rem;
+  border-radius: var(--kt-radius-pill);
+  font-size: 11px;
+  line-height: 1;
+  border: 1px solid color-mix(in srgb, var(--gem) 40%, transparent);
+  background: color-mix(in srgb, var(--gem) 10%, transparent);
+  color: var(--gem-text);
+}
+html.dark .kt-chip { color: var(--gem-text-dark); }
+.kt-chip--iolite { --gem: var(--kt-color-iolite); --gem-text: var(--kt-color-iolite); --gem-text-dark: var(--kt-color-iolite-light); }
+.kt-chip--aquamarine { --gem: var(--kt-color-aquamarine); --gem-text: var(--kt-color-aquamarine-shadow); --gem-text-dark: var(--kt-color-aquamarine-light); }
+.kt-chip--sage { --gem: var(--kt-color-sage); --gem-text: var(--kt-color-sage-shadow); --gem-text-dark: var(--kt-color-sage-light); }
+.kt-chip--amber { --gem: var(--kt-color-amber); --gem-text: var(--kt-color-amber-shadow); --gem-text-dark: var(--kt-color-amber-light); }
+.kt-chip--coral { --gem: var(--kt-color-coral); --gem-text: var(--kt-color-coral-shadow); --gem-text-dark: var(--kt-color-coral-light); }
+.kt-chip--sapphire { --gem: var(--kt-color-sapphire); --gem-text: var(--kt-color-sapphire); --gem-text-dark: var(--kt-color-sapphire-light); }
+.kt-chip--taaffeite { --gem: var(--kt-color-taaffeite); --gem-text: var(--kt-color-taaffeite-shadow); --gem-text-dark: var(--kt-color-taaffeite-light); }
+
+/* Status dot: colour says the state; it never animates. Always pair with
+   a text label (visible, title, or sr-only). */
+.kt-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: var(--kt-neutral);
+  flex-shrink: 0;
+}
+.kt-dot--live { background: var(--kt-live); }
+.kt-dot--ok { background: var(--kt-ok); }
+.kt-dot--attention { background: var(--kt-attention); }
+.kt-dot--danger { background: var(--kt-danger); }
+
+/* Micro section label. */
+.kt-section-title {
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--kt-color-warm-500);
+}
+
+.kt-input {
+  width: 100%;
+  height: 2rem;
+  padding: 0 0.625rem;
+  border-radius: var(--kt-radius-control);
+  background: var(--v2-card);
+  border: 1px solid var(--v2-line-strong);
+  font-size: var(--kt-fs-body);
+  transition: border-color var(--kt-dur-fast), box-shadow var(--kt-dur-fast);
+}
+.kt-input::placeholder { color: var(--color-text-faint); }
+.kt-input:focus {
+  outline: none;
+  border-color: var(--kt-color-iolite);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--kt-color-iolite) 22%, transparent);
+}
+.kt-input[aria-invalid="true"] { border-color: var(--kt-color-coral); }
+
+/* Segmented control: the selected segment is a raised surface chip, not a fill. */
+.kt-seg {
+  display: inline-flex;
+  padding: 0.125rem;
+  gap: 0.125rem;
+  border-radius: var(--kt-radius-control);
+  background: color-mix(in srgb, var(--kt-color-warm-200) 50%, transparent);
+}
+html.dark .kt-seg { background: color-mix(in srgb, var(--kt-color-warm-800) 70%, transparent); }
+.kt-seg > button {
+  height: 1.5rem;
+  padding: 0 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 11px;
+  color: var(--v2-ink-2);
+}
+.kt-seg > button[aria-checked="true"],
+.kt-seg > button[aria-pressed="true"] {
+  background: var(--v2-card);
+  color: var(--v2-ink);
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+
+/* Inline banner (section-level error/status), role="alert"/"status". */
+.kt-banner {
+  --gem: var(--kt-color-coral);
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--kt-radius-control);
+  border: 1px solid color-mix(in srgb, var(--gem) 30%, transparent);
+  background: color-mix(in srgb, var(--gem) 10%, transparent);
+  font-size: var(--kt-fs-body);
+}
+.kt-banner--attention { --gem: var(--kt-color-amber); }
+.kt-banner--ok { --gem: var(--kt-color-sage); }
+.kt-banner--info { --gem: var(--kt-color-iolite); }
+
+/* Phones: every dialog becomes fullscreen with one rule, instead of a
+   :fullscreen prop sprinkled over 20 templates. */
+@media (max-width: 767px) {
+  .kt-dialog {
+    width: 100% !important;
+    max-width: 100vw !important;
+    min-height: 100dvh;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+  .kt-dialog__body {
+    max-height: calc(100dvh - 120px); /* keep actions above the soft keyboard */
+    overflow-y: auto;
+  }
+}
+
+/* ══ App layer: GPU job runner ══════════════════════════════════════
+   Everything below reads tokens only; no literal colours except #fff on
+   solid gem buttons. */
+html { background: var(--v2-rail); }
+body { background: var(--v2-canvas); color: var(--v2-ink); font-size: var(--kt-fs-body); }
+#app { height: 100%; }
+[v-cloak] { display: none; }
+iconify-icon { display: inline-block; width: 1em; height: 1em; vertical-align: -0.125em; flex-shrink: 0; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.grow { flex: 1; min-width: 0; }
+.muted { color: var(--v2-ink-2); }
+.faint { color: var(--v2-ink-3); }
+.meta { font-family: var(--font-mono); font-size: 11px; color: var(--v2-ink-3); }
+.sep { width: 1px; height: 12px; background: currentColor; opacity: 0.15; flex-shrink: 0; }
+kbd { display: inline-block; padding: 0 0.3rem; min-width: 1.1rem; text-align: center; border-radius: 0.25rem; border: 1px solid var(--v2-line-strong); background: var(--v2-card); font-size: 10px; line-height: 1.4; color: var(--v2-ink-2); }
+.tone-aquamarine { --tone: var(--kt-color-aquamarine); }
+.tone-sage { --tone: var(--kt-color-sage); }
+.tone-amber { --tone: var(--kt-color-amber); }
+.tone-coral { --tone: var(--kt-color-coral); }
+.tone-iolite { --tone: var(--kt-color-iolite); }
+.tone-sapphire { --tone: var(--kt-color-sapphire); }
+.tone-warm { --tone: var(--kt-color-warm-400); }
+
+/* Icon button (the base layer has .kt-btn--icon at 32px; dense chrome uses 28px). */
+.icon-btn { display: inline-grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: var(--kt-radius-control); color: var(--kt-color-warm-600); font-size: 1rem; flex-shrink: 0; transition: background-color var(--kt-dur-fast), color var(--kt-dur-fast); }
+html.dark .icon-btn { color: var(--kt-color-warm-400); }
+.icon-btn:hover { background: var(--v2-hover); color: var(--v2-ink); }
+.icon-btn.danger:hover { color: var(--kt-danger-text); background: color-mix(in srgb, var(--kt-color-coral) 10%, transparent); }
+.icon-btn.info:hover { color: var(--kt-accent-text); background: color-mix(in srgb, var(--kt-color-iolite) 10%, transparent); }
+.kt-btn.btn-sm { height: 1.75rem; padding: 0 0.625rem; font-size: var(--kt-fs-caption); }
+.kt-btn--secondary.danger:hover:not(:disabled) { border-color: color-mix(in srgb, var(--kt-color-coral) 60%, transparent); color: var(--kt-danger-text); }
+.kt-btn:focus-visible, .icon-btn:focus-visible { outline-offset: 2px; }
+
+/* ── Shell ── */
+.shell { display: flex; height: 100%; overflow: hidden; }
+.rail { width: 240px; flex-shrink: 0; display: flex; flex-direction: column; min-height: 0; background: var(--v2-rail); border-right: 1px solid var(--v2-line-strong); }
+.rail-brand { height: 2.75rem; flex-shrink: 0; display: flex; align-items: center; gap: 0.5rem; padding: 0 0.5rem 0 0.875rem; }
+.brand-mark { width: 1.75rem; height: 1.75rem; border-radius: 9999px; background: var(--kt-color-iolite); color: #fff; display: grid; place-items: center; font-size: 0.95rem; flex-shrink: 0; }
+.brand-name { font-weight: 600; line-height: 1.15; }
+.brand-name small { display: block; font-weight: 400; font-family: var(--font-mono); font-size: 10px; color: var(--v2-ink-3); }
+.rail-new { margin: 0.375rem 0.75rem 0.75rem; }
+.rail-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 0.5rem 0.75rem; display: flex; flex-direction: column; gap: 1px; }
+.rail-caption { display: flex; justify-content: space-between; align-items: center; padding: 0.875rem 0.75rem 0.25rem; }
+.rail-empty { padding: 0.25rem 0.75rem; font-size: var(--kt-fs-caption); color: var(--v2-ink-3); }
+.nav-item { display: flex; align-items: center; gap: 0.625rem; width: 100%; height: 2.25rem; padding: 0 0.75rem; border-radius: var(--kt-radius-control); color: var(--v2-ink-2); text-align: left; transition: background-color var(--kt-dur-fast), color var(--kt-dur-fast); }
+.nav-item > iconify-icon { font-size: 1rem; }
+.nav-item:hover, .nav-item[aria-current="page"] { background: color-mix(in srgb, var(--kt-color-warm-300) 50%, transparent); }
+html.dark .nav-item:hover, html.dark .nav-item[aria-current="page"] { background: color-mix(in srgb, var(--kt-color-warm-700) 50%, transparent); }
+.nav-item[aria-current="page"] { color: var(--v2-ink); font-weight: 500; }
+.nav-item .count { margin-left: auto; font-size: 11px; color: var(--v2-ink-3); font-weight: 400; }
+.nav-item--job { height: 2rem; font-size: var(--kt-fs-caption); }
+.rail-foot { flex-shrink: 0; border-top: 1px solid var(--v2-line-strong); padding: 0.625rem 0.75rem calc(0.75rem + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 0.5rem; }
+.rail-foot .row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.demo-btns { display: flex; flex-direction: column; align-items: stretch; }
+.demo-btns .kt-btn { justify-content: flex-start; height: 1.75rem; font-size: var(--kt-fs-caption); font-weight: 400; padding: 0 0.5rem; }
+.kt-seg > button { display: inline-flex; align-items: center; gap: 0.25rem; transition: background-color var(--kt-dur-fast), color var(--kt-dur-fast); }
+.kt-seg > button:hover:not([aria-checked="true"]) { color: var(--v2-ink); }
+.kt-seg .n { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--v2-ink-3); font-size: 10px; }
+
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--v2-canvas); }
+.header { height: 2.75rem; flex-shrink: 0; display: flex; align-items: center; gap: 0.75rem; padding: 0 1rem; background: var(--v2-chrome); border-bottom: 1px solid var(--v2-line-strong); }
+.header h1 { font-size: var(--kt-fs-body); font-weight: 600; }
+.header .crumb { font-size: var(--kt-fs-body); color: var(--v2-ink-3); }
+.kbd-hint { display: flex; align-items: center; gap: 0.25rem; font-size: 11px; color: var(--v2-ink-3); }
+
+/* App-level connection banner: one strip, not one per panel. */
+.conn-banner { flex-shrink: 0; border-radius: 0; border-width: 0 0 1px; align-items: center; padding: 0.5rem 1rem; flex-wrap: wrap; }
+.conn-banner > iconify-icon { font-size: 1rem; color: var(--gem); }
+.conn-banner code { display: block; margin-top: 0.125rem; font-size: 11px; color: var(--kt-danger-text); overflow-wrap: anywhere; }
+
+.workspace { flex: 1; min-height: 0; display: flex; position: relative; }
+.content { flex: 1; min-width: 0; overflow-y: auto; }
+.page { padding: 1.25rem; max-width: 1600px; margin: 0 auto; display: flex; flex-direction: column; gap: 1rem; }
+
+/* ── KPI tiles ── */
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; }
+.tile { display: flex; flex-direction: column; gap: 0.25rem; padding: 0.75rem 1rem; text-align: left; transition: border-color var(--kt-dur-fast), box-shadow var(--kt-dur-fast); }
+.tile:hover { border-color: var(--v2-line-strong); }
+.tile[aria-pressed="true"] { border-color: color-mix(in srgb, var(--kt-color-iolite) 45%, transparent); }
+.tile .lbl { display: flex; align-items: center; gap: 0.375rem; }
+.tile .lbl iconify-icon { font-size: 0.8rem; color: var(--v2-ink-3); }
+.tile .val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 22px; font-weight: 600; line-height: 1.2; color: var(--v2-ink); }
+.tile .val small { font-size: var(--kt-fs-caption); font-weight: 400; color: var(--v2-ink-3); margin-left: 0.25rem; }
+.tile .note { font-size: 11px; color: var(--v2-ink-2); }
+.kt-section-title { color: var(--v2-ink-2); }
+.tap-row > .grow { display: flex; flex-direction: column; gap: 0.125rem; }
+
+/* ── Section card ── */
+.card { overflow: hidden; }
+.card-head { display: flex; align-items: center; gap: 0.5rem; height: 2.5rem; padding: 0 1rem; border-bottom: 1px solid var(--v2-line); }
+.card-head > iconify-icon { color: var(--v2-ink-3); }
+.card-head h2 { font-size: var(--kt-fs-body); font-weight: 600; }
+.card-head .hint { font-size: 11px; color: var(--v2-ink-3); }
+.card-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border-bottom: 1px solid var(--v2-line); }
+.search { position: relative; margin-left: auto; width: min(16rem, 100%); }
+.search iconify-icon { position: absolute; left: 0.6rem; top: 50%; transform: translateY(-50%); color: var(--v2-ink-3); pointer-events: none; }
+.search .kt-input { padding-left: 1.9rem; height: 1.75rem; font-size: var(--kt-fs-caption); }
+.state { padding: 2.5rem 1rem; text-align: center; color: var(--v2-ink-2); display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+.state .ico { width: 3rem; height: 3rem; border-radius: var(--kt-radius-card); display: grid; place-items: center; font-size: 1.4rem; background: var(--v2-panel); color: var(--v2-ink-3); border: 1px solid var(--v2-line); }
+.state .ico.good { color: var(--kt-ok-text); background: color-mix(in srgb, var(--kt-color-sage) 10%, transparent); border-color: color-mix(in srgb, var(--kt-color-sage) 30%, transparent); }
+.state p { max-width: 46ch; }
+.state .title { color: var(--v2-ink); font-weight: 500; }
+.state .sub { font-size: var(--kt-fs-caption); color: var(--v2-ink-3); }
+
+/* ── Jobs table (desktop) ── */
+/* The table sizes to its container, not the viewport: with the detail pane open a 1440px window still leaves a narrow card. The job name is the column that must never collapse; lower-priority columns drop first. */
+.jobs-cq { container-type: inline-size; }
+@container (max-width: 820px) { .jobs-table .col-gpu { display: none; } }
+.jobs-table { width: 100%; border-collapse: collapse; font-size: var(--kt-fs-caption); table-layout: fixed; }
+.jobs-table th { height: 2rem; padding: 0 0.75rem; text-align: left; font-weight: 500; color: var(--v2-ink-3); border-bottom: 1px solid var(--v2-line); white-space: nowrap; }
+.jobs-table td { height: 3.25rem; padding: 0 0.75rem; border-bottom: 1px solid var(--v2-line); vertical-align: middle; }
+.jobs-table th:first-child, .jobs-table td:first-child { padding-left: 1rem; }
+.jobs-table tbody tr:last-child td { border-bottom: 0; }
+.jobs-table tbody tr { cursor: pointer; transition: background-color var(--kt-dur-fast); }
+.jobs-table tbody tr:hover { background: var(--v2-hover); }
+.jobs-table tbody tr[aria-selected="true"] { background: color-mix(in srgb, var(--kt-color-iolite) 10%, transparent); }
+.jobs-table tbody tr:focus-visible { outline-offset: -2px; }
+.jobs-table .r { text-align: right; }
+.job-name { font-size: var(--kt-fs-body); font-weight: 500; color: var(--v2-ink); }
+.cell-2 { display: flex; flex-direction: column; min-width: 0; line-height: 1.35; }
+.row-actions { display: flex; justify-content: flex-end; gap: 0.125rem; }
+.group[aria-selected="true"] .hover-only-action { opacity: 1; }
+
+/* Progress: 6px track, fill in the status colour, mono value in a fixed column. */
+.prog { display: flex; align-items: center; gap: 0.5rem; }
+.bar { flex: 1; min-width: 2.5rem; height: 6px; border-radius: 9999px; background: var(--v2-line); overflow: hidden; }
+.bar > i { display: block; height: 100%; border-radius: inherit; background: var(--tone, var(--kt-color-iolite)); transition: width 0.3s ease; }
+.prog .v { width: 2.6rem; text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 11px; color: var(--v2-ink-2); flex-shrink: 0; }
+
+/* ── Tap rows (phone) ── */
+.tap-row { display: flex; align-items: center; gap: 0.75rem; width: 100%; min-height: 3.5rem; padding: 0.625rem 1rem; text-align: left; border-bottom: 1px solid var(--v2-line); transition: background-color var(--kt-dur-fast); }
+.tap-row:last-child { border-bottom: 0; }
+.tap-row:active { background: color-mix(in srgb, var(--kt-color-warm-200) 60%, transparent); }
+html.dark .tap-row:active { background: color-mix(in srgb, var(--kt-color-warm-700) 50%, transparent); }
+.tap-row .l1 { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.tap-row .chev { color: var(--v2-ink-3); }
+.tap-row .bar { margin-top: 0.375rem; }
+
+/* ── Detail pane ── */
+.detail { width: 460px; flex-shrink: 0; display: flex; flex-direction: column; min-height: 0; background: var(--v2-panel); border-left: 1px solid var(--v2-line-strong); }
+.detail--sheet { position: absolute; top: 0; right: 0; bottom: 0; width: min(520px, 100%); z-index: 30; box-shadow: var(--v2-float-shadow); }
+.detail--full { position: fixed; inset: 0; width: 100%; z-index: 40; border: 0; background: var(--v2-canvas); }
+.detail-head { display: flex; align-items: center; gap: 0.5rem; min-height: 3rem; padding: 0.5rem 0.75rem 0.5rem 1rem; border-bottom: 1px solid var(--v2-line); flex-shrink: 0; }
+.detail--full .detail-head { padding-top: calc(0.5rem + env(safe-area-inset-top)); padding-left: 0.5rem; }
+.detail-name { font-size: var(--kt-fs-title); font-weight: 600; line-height: 1.3; }
+.detail-actions { display: flex; flex-wrap: wrap; gap: 0.375rem; padding: 0.625rem 1rem; border-bottom: 1px solid var(--v2-line); flex-shrink: 0; }
+.detail-body { flex: 1; min-height: 0; overflow-y: auto; padding: 0.875rem 1rem calc(1rem + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 0.75rem; }
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.625rem 1rem; padding: 0.875rem 1rem; }
+.facts dt { margin-bottom: 0.125rem; }
+.facts dd { font-size: var(--kt-fs-caption); color: var(--v2-ink); min-width: 0; }
+.facts dd.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.facts .wide { grid-column: 1 / -1; }
+.fail-box { align-items: flex-start; }
+.fail-box iconify-icon { color: var(--kt-color-coral); margin-top: 0.15rem; }
+.fail-box code { display: block; font-size: 11px; margin-top: 0.25rem; color: var(--kt-danger-text); white-space: pre-wrap; overflow-wrap: anywhere; }
+.loss-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; padding: 0.75rem 1rem 0.25rem; }
+.loss-tiles .val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 18px; font-weight: 600; color: var(--v2-ink); line-height: 1.3; }
+.loss-tiles .note { font-size: 11px; color: var(--v2-ink-3); font-family: var(--font-mono); }
+.delta-good { color: var(--kt-ok-text); }
+.delta-bad { color: var(--kt-danger-text); }
+.detail-body > * { flex-shrink: 0; }
+.field .kt-seg { align-self: flex-start; }
+.detail-empty { flex: 1; display: grid; place-items: center; padding: 2rem; }
+
+/* Loss chart: transparent background, single series, raw at 30% under the EMA. */
+.chart { position: relative; padding: 0.25rem 0.5rem 0.5rem; touch-action: pan-y; }
+.chart svg { display: block; overflow: visible; }
+.chart .grid line { stroke: var(--kt-chart-grid); }
+.chart .axis text { fill: var(--kt-chart-axis); font-size: 11px; font-family: var(--font-sans); font-variant-numeric: tabular-nums; }
+.chart .ln-raw { fill: none; stroke: var(--kt-chart-cat-1); stroke-opacity: 0.3; stroke-width: 1; }
+.chart .ln-ema { fill: none; stroke: var(--kt-chart-cat-1); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart .xhair { stroke: var(--kt-chart-axis); stroke-opacity: 0.5; stroke-dasharray: 3 3; }
+.chart .hdot { fill: var(--kt-chart-cat-1); stroke: var(--v2-card); stroke-width: 2; }
+.chart .nan-rule { stroke: var(--kt-chart-bad); stroke-dasharray: 4 3; stroke-opacity: 0.7; }
+.chart .nan-dot { fill: var(--v2-card); stroke: var(--kt-chart-bad); stroke-width: 1.5; }
+.chart .nan-lbl { fill: var(--kt-chart-bad); font-size: 10px; font-family: var(--font-mono); }
+.chart-tip { position: absolute; top: 0.25rem; pointer-events: none; min-width: 9.5rem; padding: 0.375rem 0.5rem; font-size: 11px; line-height: 1.5; }
+.chart-tip .row { display: flex; align-items: center; gap: 0.375rem; }
+.chart-tip .row b { margin-left: auto; font-family: var(--font-mono); font-weight: 500; font-variant-numeric: tabular-nums; }
+.swatch { width: 8px; height: 8px; border-radius: 2px; background: var(--kt-chart-cat-1); flex-shrink: 0; }
+.swatch.raw { opacity: 0.35; }
+.chart-empty { height: 180px; display: grid; place-items: center; font-size: var(--kt-fs-caption); color: var(--v2-ink-3); }
+
+/* Log viewer: theme tokens, not a pinned dark terminal. */
+.log-wrap { position: relative; }
+.log { height: 300px; overflow: auto; padding: 0.375rem 0; font-family: var(--font-mono); font-size: 11.5px; line-height: 1.6; background: var(--v2-card); overscroll-behavior: contain; }
+.log-line { display: flex; gap: 0.625rem; padding: 0 0.75rem; }
+.log-line .t { color: var(--v2-ink-3); flex-shrink: 0; }
+.log-line .lv { width: 2.6rem; flex-shrink: 0; color: var(--v2-ink-3); }
+.log-line .msg { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; color: var(--v2-ink); }
+.log-line.WARN .lv { color: var(--kt-attention-text); }
+.log-line.ERROR { background: color-mix(in srgb, var(--kt-color-coral) 8%, transparent); }
+.log-line.ERROR .lv, .log-line.ERROR .msg { color: var(--kt-danger-text); }
+.new-pill { position: absolute; left: 50%; bottom: 0.625rem; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 0.25rem; height: 1.625rem; padding: 0 0.625rem; border-radius: 9999px; font-size: 11px; font-weight: 500; background: color-mix(in srgb, var(--kt-color-aquamarine) 15%, var(--v2-card)); border: 1px solid color-mix(in srgb, var(--kt-color-aquamarine) 40%, transparent); color: var(--kt-live-text); }
+.log-foot { display: flex; align-items: center; gap: 0.5rem; height: 1.75rem; padding: 0 0.75rem; border-top: 1px solid var(--v2-line); font-size: 11px; color: var(--v2-ink-3); }
+.log-foot .working { color: var(--kt-live-text); }
+
+/* ── GPU view ── */
+.gpu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 0.75rem; padding: 1rem; }
+.gpu { padding: 0.75rem 0.875rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.gpu .top { display: flex; align-items: center; gap: 0.5rem; }
+.gpu .id { font-family: var(--font-mono); font-size: var(--kt-fs-caption); font-weight: 500; }
+.gpu .job { font-size: var(--kt-fs-caption); color: var(--kt-accent-text); text-align: left; text-decoration: none; }
+.gpu .job:hover { text-decoration: underline; }
+.gpu .metric { display: grid; grid-template-columns: 3rem 1fr auto; align-items: center; gap: 0.5rem; font-size: 11px; color: var(--v2-ink-3); }
+.gpu .metric .v { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--v2-ink-2); min-width: 5.5rem; text-align: right; }
+
+/* ── Status bar ── */
+.statusbar { height: 1.5rem; flex-shrink: 0; display: flex; align-items: center; gap: 0.5rem; padding: 0 0.75rem; font-family: var(--font-mono); font-size: 10px; color: var(--v2-ink-3); background: var(--v2-chrome); border-top: 1px solid var(--v2-line-strong); white-space: nowrap; overflow: hidden; }
+.statusbar .warn { color: var(--kt-attention-text); }
+
+/* ── Dialog ── */
+.modal-scrim { position: fixed; inset: 0; z-index: 50; background: rgb(0 0 0 / 0.4); display: flex; align-items: flex-start; justify-content: center; padding: 6vh 1rem 1rem; overflow-y: auto; }
+html.dark .modal-scrim { background: rgb(0 0 0 / 0.6); }
+.kt-dialog { width: 100%; max-width: 38rem; max-height: 88vh; display: flex; flex-direction: column; }
+.kt-dialog.sm { max-width: 26rem; }
+.dlg-head { display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 0.75rem 0.75rem 1rem; border-bottom: 1px solid var(--v2-line); flex-shrink: 0; }
+.dlg-head h2 { font-size: var(--kt-fs-title); font-weight: 600; flex: 1; }
+.kt-dialog__body { flex: 1; min-height: 0; overflow-y: auto; padding: 1rem; }
+.dlg-foot { display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem; padding: 0.75rem 1rem; border-top: 1px solid var(--v2-line); flex-shrink: 0; }
+.dlg-foot .note { margin-right: auto; font-size: 11px; color: var(--v2-ink-3); }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.875rem 1rem; }
+.form-grid .wide { grid-column: 1 / -1; }
+.field { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
+.field label, .field .label { font-size: var(--kt-fs-caption); font-weight: 500; color: var(--v2-ink-2); }
+.field .hint { font-size: 11px; color: var(--v2-ink-3); }
+.field .err { font-size: 11.5px; color: var(--kt-danger-text); display: flex; gap: 0.25rem; align-items: center; }
+.field .kt-input.mono { font-family: var(--font-mono); font-size: var(--kt-fs-caption); }
+select.kt-input { appearance: none; padding-right: 1.75rem; cursor: pointer; background-image: none; }
+.select-wrap { position: relative; }
+.select-wrap iconify-icon { position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--v2-ink-3); }
+textarea.kt-input { height: auto; min-height: 4.5rem; padding: 0.5rem 0.625rem; resize: vertical; line-height: 1.5; }
+.confirm-body { font-size: var(--kt-fs-body); color: var(--v2-ink-2); }
+.confirm-body b { color: var(--v2-ink); font-weight: 600; }
+
+/* ── Toasts: tinted border + coloured icon, not a coloured fill. ── */
+.toasts { position: fixed; right: 1rem; bottom: 2.25rem; z-index: 60; display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-end; pointer-events: none; }
+.toast { pointer-events: auto; min-width: 16rem; max-width: 24rem; display: flex; gap: 0.5rem; align-items: flex-start; padding: 0.5rem 0.5rem 0.5rem 0.75rem; border-radius: var(--kt-radius-control); border: 1px solid color-mix(in srgb, var(--tone) 45%, var(--v2-line)); background: var(--v2-float); box-shadow: var(--v2-float-shadow); font-size: var(--kt-fs-caption); }
+.toast > iconify-icon { color: var(--tone); font-size: 0.95rem; margin-top: 0.1rem; }
+.toast .icon-btn { width: 1.375rem; height: 1.375rem; font-size: 0.8rem; }
+
+/* Transitions: 200ms fade + 10px slide, nothing else. */
+.fade-enter-active, .fade-leave-active { transition: opacity var(--kt-dur) var(--kt-ease), transform var(--kt-dur) var(--kt-ease); }
+.fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(10px); }
+.sheet-enter-active, .sheet-leave-active { transition: opacity var(--kt-dur) var(--kt-ease), transform var(--kt-dur) var(--kt-ease); }
+.sheet-enter-from, .sheet-leave-to { opacity: 0; transform: translateX(10px); }
+.scrim { position: fixed; inset: 0; z-index: 44; background: rgb(0 0 0 / 0.4); }
+
+/* ── Regular density (<1280): detail becomes an overlay sheet (JS), KPIs stay 4-up. ── */
+@media (max-width: 1023px) {
+  .col-gpu { display: none; }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ── Compact (<768): phone is its own design. ── */
+@media (max-width: 767px) {
+  .rail { position: fixed; top: 0; left: 0; bottom: 0; width: 18rem; max-width: 85vw; z-index: 45; transform: translateX(-100%); transition: transform var(--kt-dur) var(--kt-ease), visibility var(--kt-dur); visibility: hidden; }
+  .rail.is-open { transform: none; visibility: visible; box-shadow: var(--v2-float-shadow); }
+  .rail-brand { padding-top: env(safe-area-inset-top); height: calc(3rem + env(safe-area-inset-top)); }
+  .header { height: calc(3rem + env(safe-area-inset-top)); padding: env(safe-area-inset-top) 0.25rem 0 0.25rem; gap: 0.25rem; }
+  .header h1 { font-size: var(--kt-fs-emphasis); }
+  .page { padding: 0.75rem; gap: 0.75rem; }
+  .card-toolbar { padding: 0.5rem 0.75rem; }
+  .card-toolbar .kt-seg { width: 100%; overflow-x: auto; }
+  .search { width: 100%; margin-left: 0; }
+  .search .kt-input { height: 2.5rem; }
+  .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .log { height: 50vh; }
+  .modal-scrim { padding: 0; }
+  .kt-dialog { max-height: none; border-width: 0; }
+  .dlg-head { padding-top: calc(0.75rem + env(safe-area-inset-top)); }
+  .dlg-foot { padding-bottom: calc(0.75rem + env(safe-area-inset-bottom)); }
+  .dlg-foot .kt-btn { flex: 1; }
+  .dlg-foot .note { display: none; }
+  .form-grid { grid-template-columns: minmax(0, 1fr); }
+  .toasts { left: 0.75rem; right: 0.75rem; bottom: calc(0.75rem + env(safe-area-inset-bottom)); align-items: stretch; }
+  .toast { max-width: none; min-width: 0; }
+  .gpu-grid { padding: 0.75rem; grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Touch: 40px targets everywhere, hover-only actions already forced visible by base.css. */
+@media (pointer: coarse) {
+  .icon-btn { width: 2.5rem; height: 2.5rem; font-size: 1.15rem; }
+  .row-actions .icon-btn { width: 2.25rem; height: 2.25rem; }
+  .nav-item { height: 2.75rem; }
+  .nav-item--job { height: 2.5rem; }
+  .kt-seg > button { height: 2.25rem; padding: 0 0.75rem; font-size: var(--kt-fs-caption); }
+  .kt-btn.btn-sm, .demo-btns .kt-btn { height: 2.5rem; }
+  .search .kt-input { height: 2.5rem; }
+  .kt-input { height: 2.5rem; }
+  .toast .icon-btn { width: 2rem; height: 2rem; }
+  .tile { min-height: 5.5rem; }
+}
+@media (hover: none) { * { -webkit-tap-highlight-color: transparent; } }
+</style>
+</head>
+<body>
+<div id="app" v-cloak></div>
+
+<!-- ═════════ Root template ═════════ -->
+<script type="text/x-template" id="tpl-app">
+<div class="shell">
+  <transition name="fade"><div v-if="compact && drawer" class="scrim" @click="drawer = false"></div></transition>
+
+  <!-- Nav rail (a drawer on phones) -->
+  <aside class="rail" :class="{ 'is-open': drawer }" aria-label="Main navigation" ref="railEl">
+    <div class="rail-brand">
+      <span class="brand-mark" aria-hidden="true"><iconify-icon icon="carbon:chip"></iconify-icon></span>
+      <div class="brand-name grow">Job runner<small>runner-01 · 8 GPUs</small></div>
+      <button v-if="compact" class="icon-btn" title="Close navigation" aria-label="Close navigation" @click="drawer = false"><iconify-icon icon="carbon:close"></iconify-icon></button>
+    </div>
+    <button class="kt-btn kt-btn--primary rail-new" @click="openNew($event)" title="Queue a new training job (N)">
+      <iconify-icon icon="carbon:add"></iconify-icon>New job
+    </button>
+    <nav class="rail-scroll">
+      <button class="nav-item" :aria-current="view === 'jobs' ? 'page' : null" @click="go('jobs')">
+        <iconify-icon icon="carbon:task"></iconify-icon>Jobs<span class="count num">{{ jobs.length }}</span>
+      </button>
+      <button class="nav-item" :aria-current="view === 'gpus' ? 'page' : null" @click="go('gpus')">
+        <iconify-icon icon="carbon:chip"></iconify-icon>GPUs<span class="count num">{{ busyGpuIds.size }}/{{ GPUS.length }}</span>
+      </button>
+      <div class="rail-caption kt-section-title"><span>Training now</span><span class="num">{{ runningJobs.length }}</span></div>
+      <button v-for="j in runningJobs" :key="j.id" class="nav-item nav-item--job" @click="openJob(j.id)" :title="j.name + ' · ' + pct(j) + '%'">
+        <span class="kt-dot kt-dot--live" role="img" aria-label="running"></span>
+        <span class="truncate">{{ j.name }}</span><span class="count num">{{ pct(j) }}%</span>
+      </button>
+      <p v-if="!runningJobs.length" class="rail-empty">Nothing is training right now.</p>
+    </nav>
+    <div class="rail-foot">
+      <div class="kt-section-title">Demo controls</div>
+      <div class="demo-btns">
+        <button class="kt-btn kt-btn--ghost" @click="dropConnection" :disabled="conn !== 'online'" :title="conn !== 'online' ? 'The runner is already disconnected.' : 'Simulate the backend connection dropping.'">
+          <iconify-icon icon="carbon:plug"></iconify-icon>Drop connection
+        </button>
+        <button class="kt-btn kt-btn--ghost" @click="toggleEmpty" :title="stash ? 'Bring the mock jobs back.' : 'Remove every job to see the empty state.'">
+          <iconify-icon :icon="stash ? 'carbon:reset' : 'carbon:clean'"></iconify-icon>{{ stash ? 'Restore mock jobs' : 'Clear all jobs' }}
+        </button>
+      </div>
+      <div class="row">
+        <span class="kt-section-title">Theme</span>
+        <div class="kt-seg" role="radiogroup" aria-label="Theme">
+          <button v-for="t in THEMES" :key="t.id" role="radio" :aria-checked="theme === t.id" :title="t.title" :aria-label="t.title" @click="setTheme(t.id)">
+            <iconify-icon :icon="t.icon"></iconify-icon>
+          </button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="header">
+      <button v-if="compact" class="icon-btn" title="Open navigation" aria-label="Open navigation" @click="openDrawer"><iconify-icon icon="carbon:menu"></iconify-icon></button>
+      <span v-if="!compact" class="crumb">runner-01 /</span>
+      <h1>{{ view === 'jobs' ? 'Jobs' : 'GPUs' }}</h1>
+      <span class="grow"></span>
+      <span v-if="!compact" class="kbd-hint" aria-hidden="true"><kbd>/</kbd> search · <kbd>N</kbd> new job · <kbd>J</kbd><kbd>K</kbd> move · <kbd>Esc</kbd> close</span>
+      <span class="kt-chip" :class="connChip.cls" :title="connChip.title">
+        <span class="kt-dot" :class="connChip.dot" aria-hidden="true"></span>{{ connChip.label }}
+      </span>
+      <button v-if="compact" class="icon-btn" title="New job" aria-label="New job" @click="openNew($event)"><iconify-icon icon="carbon:add"></iconify-icon></button>
+    </header>
+
+    <!-- One app-level connection banner: amber while reconnecting, coral once it gives up. -->
+    <div v-if="conn !== 'online'" class="kt-banner conn-banner" :class="{ 'kt-banner--attention': conn === 'reconnecting' }" role="alert">
+      <iconify-icon :icon="conn === 'reconnecting' ? 'carbon:renew' : 'carbon:warning-filled'"></iconify-icon>
+      <div class="grow">
+        <template v-if="conn === 'reconnecting'">
+          <b class="kohaku-pulse">Disconnected from runner-01 — reconnecting…</b>
+          <span class="muted"> Attempt {{ attempt }} of 3 · jobs below are from <span class="num">{{ clock(lastSync) }}</span>.</span>
+        </template>
+        <template v-else>
+          <b>Could not reach runner-01.</b>
+          <span class="muted"> Jobs below are from <span class="num">{{ clock(lastSync) }}</span> and are not updating. Check that the runner service is up, then retry.</span>
+          <code>{{ connError }}</code>
+        </template>
+      </div>
+      <button v-if="conn === 'offline'" class="kt-btn kt-btn--secondary btn-sm" @click="reconnect" :disabled="retrying">
+        <iconify-icon :icon="retrying ? 'carbon:circle-dash' : 'carbon:renew'" :class="{ spin: retrying }"></iconify-icon>{{ retrying ? 'Retrying…' : 'Retry' }}
+      </button>
+    </div>
+
+    <div class="workspace">
+      <main class="content">
+        <!-- ═══ Jobs view ═══ -->
+        <div v-if="view === 'jobs'" class="page">
+          <section class="kpis" aria-label="Summary">
+            <button v-for="k in kpis" :key="k.id" class="kt-v2-card tile" :aria-pressed="k.filter ? filter === k.filter : null" @click="onKpi(k)" :title="k.title">
+              <span class="lbl kt-section-title"><iconify-icon :icon="k.icon"></iconify-icon>{{ k.label }}</span>
+              <span class="val">{{ k.value }}<small v-if="k.unit">{{ k.unit }}</small></span>
+              <span class="note truncate">{{ k.note }}</span>
+            </button>
+          </section>
+
+          <section class="kt-v2-card card" aria-labelledby="jobs-h">
+            <div class="card-head">
+              <iconify-icon icon="carbon:task"></iconify-icon>
+              <h2 id="jobs-h">Training jobs</h2>
+              <span class="meta">{{ filtered.length }}<template v-if="filtered.length !== jobs.length"> of {{ jobs.length }}</template></span>
+              <span class="grow"></span>
+              <span class="hint" :title="'Last update from the runner at ' + clock(lastSync)">updated {{ ago(lastSync) }}</span>
+            </div>
+            <div class="card-toolbar">
+              <div class="kt-seg" role="radiogroup" aria-label="Filter by status">
+                <button v-for="f in FILTERS" :key="f.id" role="radio" :aria-checked="filter === f.id" @click="setFilter(f.id)">
+                  {{ f.label }} <span class="n">{{ counts[f.id] }}</span>
+                </button>
+              </div>
+              <div class="search">
+                <iconify-icon icon="carbon:search"></iconify-icon>
+                <input ref="searchEl" v-model="query" class="kt-input" type="search" placeholder="Search jobs…" aria-label="Search jobs by name, id or model" @keydown.esc="onSearchEsc">
+              </div>
+            </div>
+
+            <!-- Four states, fixed order: error is the app banner (data stays), then loading, empty, content. -->
+            <div v-if="loading && !jobs.length" class="state" aria-busy="true"><p>Loading…</p></div>
+            <div v-else-if="!jobs.length" class="state">
+              <span class="ico" aria-hidden="true"><iconify-icon icon="carbon:task-add"></iconify-icon></span>
+              <p class="title">No training jobs on runner-01 yet.</p>
+              <p class="sub">Queue a job and it starts as soon as enough GPUs are free. All 8 GPUs are idle.</p>
+              <button class="kt-btn kt-btn--secondary" @click="openNew($event)"><iconify-icon icon="carbon:add"></iconify-icon>Queue a job</button>
+            </div>
+            <div v-else-if="!filtered.length" class="state">
+              <template v-if="query">
+                <span class="ico" aria-hidden="true"><iconify-icon icon="carbon:search"></iconify-icon></span>
+                <p class="title">No {{ filter === 'all' ? '' : filter + ' ' }}jobs match “{{ query }}”.</p>
+                <button class="kt-btn kt-btn--ghost" @click="query = ''; setFilter('all')">Clear search and filter</button>
+              </template>
+              <template v-else-if="filter === 'failed'">
+                <span class="ico good" aria-hidden="true"><iconify-icon icon="carbon:checkmark"></iconify-icon></span>
+                <p class="title">No failed jobs on this runner.</p>
+                <button class="kt-btn kt-btn--ghost" @click="setFilter('all')">Show all jobs</button>
+              </template>
+              <template v-else>
+                <span class="ico" aria-hidden="true"><iconify-icon :icon="STATUS[filter].icon"></iconify-icon></span>
+                <p class="title">No {{ filter }} jobs right now.</p>
+                <button class="kt-btn kt-btn--ghost" @click="setFilter('all')">Show all jobs</button>
+              </template>
+            </div>
+
+            <!-- Phone: tap rows → detail page -->
+            <div v-else-if="compact" role="list">
+              <button v-for="j in filtered" :key="j.id" class="tap-row" role="listitem" @click="openJob(j.id, $event)">
+                <span class="grow">
+                  <span class="l1"><span class="job-name truncate" :title="j.name">{{ j.name }}</span><status-chip :status="j.status"></status-chip></span>
+                  <span class="meta truncate" style="display:block">{{ j.gpuCount }}× {{ j.gpuType }} · {{ elapsedLabel(j) }}</span>
+                  <span class="prog" :class="'tone-' + STATUS[j.status].tone"><span class="bar"><i :style="{ width: pct(j) + '%' }"></i></span><span class="v">{{ pct(j) }}%</span></span>
+                </span>
+                <iconify-icon class="chev" icon="carbon:chevron-right"></iconify-icon>
+              </button>
+            </div>
+
+            <!-- Desktop: table -->
+            <div v-else class="jobs-cq"><table class="jobs-table">
+              <colgroup><col><col style="width:7rem"><col class="col-gpu" style="width:11rem"><col style="width:10rem"><col style="width:5.5rem"><col style="width:5.5rem"></colgroup>
+              <thead><tr><th>Job</th><th>Status</th><th class="col-gpu">GPU</th><th>Progress</th><th class="r">Elapsed</th><th><span class="sr-only">Actions</span></th></tr></thead>
+              <tbody>
+                <tr v-for="j in filtered" :key="j.id" class="group" tabindex="0" :aria-selected="selectedId === j.id" @click="openJob(j.id, $event)" @keydown.enter.self="openJob(j.id, $event)" @keydown.space.self.prevent="openJob(j.id, $event)">
+                  <td><div class="cell-2"><span class="job-name truncate" :title="j.name">{{ j.name }}</span><span class="meta truncate">{{ j.id }} · {{ j.model }}</span></div></td>
+                  <td><status-chip :status="j.status"></status-chip></td>
+                  <td class="col-gpu"><div class="cell-2"><span class="truncate">{{ j.gpuCount }}× {{ j.gpuType }}</span>
+                    <span class="meta truncate" :title="gpuNote(j)">{{ gpuNote(j) }}</span></div></td>
+                  <td><div class="prog" :class="'tone-' + STATUS[j.status].tone" :title="fmtInt(j.step) + ' / ' + fmtInt(j.maxSteps) + ' steps'"><span class="bar"><i :style="{ width: pct(j) + '%' }"></i></span><span class="v">{{ pct(j) }}%</span></div></td>
+                  <td class="r num" :title="j.status === 'queued' ? 'Waiting in the queue; elapsed time starts when GPUs are allocated.' : ''">{{ elapsedLabel(j) }}</td>
+                  <td><div class="row-actions">
+                    <button v-if="j.status === 'running'" class="icon-btn danger hover-only-action" title="Stop job…" :aria-label="'Stop ' + j.name" @click.stop="askStop(j, $event)"><iconify-icon icon="carbon:stop"></iconify-icon></button>
+                    <button v-if="j.status === 'queued'" class="icon-btn danger hover-only-action" title="Remove from queue…" :aria-label="'Remove ' + j.name + ' from the queue'" @click.stop="askRemove(j, $event)"><iconify-icon icon="carbon:close"></iconify-icon></button>
+                    <button v-if="j.status === 'failed'" class="icon-btn info hover-only-action" title="Retry from the last checkpoint" :aria-label="'Retry ' + j.name" @click.stop="retry(j)"><iconify-icon icon="carbon:renew"></iconify-icon></button>
+                    <button class="icon-btn info hover-only-action" title="Clone into a new job…" :aria-label="'Clone ' + j.name" @click.stop="openNew($event, j)"><iconify-icon icon="carbon:copy"></iconify-icon></button>
+                  </div></td>
+                </tr>
+              </tbody>
+            </table></div>
+          </section>
+        </div>
+
+        <!-- ═══ GPUs view ═══ -->
+        <div v-else class="page">
+          <section v-for="node in NODES" :key="node.id" class="kt-v2-card card" :aria-labelledby="'node-' + node.id">
+            <div class="card-head">
+              <iconify-icon icon="carbon:bare-metal-server"></iconify-icon>
+              <h2 :id="'node-' + node.id">{{ node.id }}</h2>
+              <span class="meta">{{ node.gpus.length }}× {{ node.model }}</span>
+              <span class="grow"></span>
+              <span class="hint num">{{ node.gpus.filter(g => busyGpuIds.has(g.id)).length }} busy · {{ node.gpus.filter(g => !busyGpuIds.has(g.id)).length }} free</span>
+            </div>
+            <div class="gpu-grid">
+              <div v-for="g in node.gpus" :key="g.id" class="kt-v2-card gpu">
+                <div class="top">
+                  <span class="kt-dot" :class="gpuJob(g) ? 'kt-dot--live' : ''" role="img" :aria-label="gpuJob(g) ? 'busy' : 'idle'" :title="gpuJob(g) ? 'Busy' : 'Idle'"></span>
+                  <span class="id">{{ g.id }}</span><span class="grow"></span>
+                  <span class="meta num">{{ stats[g.id].temp }}°C</span>
+                </div>
+                <button v-if="gpuJob(g)" class="job truncate" :title="gpuJob(g).name" @click="openJob(gpuJob(g).id)">{{ gpuJob(g).name }}</button>
+                <span v-else class="faint" style="font-size:var(--kt-fs-caption)">idle — no job assigned</span>
+                <div class="metric"><span>Util</span>
+                  <span class="bar tone-sapphire"><i :style="{ width: stats[g.id].util + '%' }"></i></span><span class="v">{{ stats[g.id].util }}%</span></div>
+                <div class="metric" :title="'Memory: calm below 60%, amber 60–80%, coral above 80%.'"><span>Memory</span>
+                  <span class="bar" :class="'tone-' + memTone(g)"><i :style="{ width: memPct(g) + '%' }"></i></span><span class="v">{{ stats[g.id].mem.toFixed(1) }} / {{ g.mem }} GB</span></div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+
+      <!-- ═══ Detail pane: side panel (≥1280), overlay sheet (768–1279), full page (<768) ═══ -->
+      <transition name="sheet">
+        <aside v-if="detailVisible" class="detail" :class="{ 'detail--sheet': density === 'regular', 'detail--full': compact }" ref="detailEl"
+               :role="density !== 'expansive' ? 'dialog' : null" :aria-modal="density !== 'expansive' ? 'true' : null" aria-label="Job details">
+          <template v-if="sel">
+            <div class="detail-head">
+              <button v-if="density !== 'expansive'" ref="detailCloseEl" class="icon-btn" :title="compact ? 'Back to jobs (Esc)' : 'Close details (Esc)'" :aria-label="compact ? 'Back to jobs' : 'Close details'" @click="closeDetail">
+                <iconify-icon :icon="compact ? 'carbon:arrow-left' : 'carbon:close'"></iconify-icon>
+              </button>
+              <div class="grow">
+                <div class="detail-name truncate" :title="sel.name">{{ sel.name }}</div>
+                <div class="meta truncate">{{ sel.id }} · {{ sel.model }}</div>
+              </div>
+              <status-chip :status="sel.status"></status-chip>
+            </div>
+            <div class="detail-actions">
+              <button v-if="sel.status === 'running'" class="kt-btn kt-btn--secondary btn-sm danger" @click="askStop(sel, $event)"><iconify-icon icon="carbon:stop"></iconify-icon>Stop…</button>
+              <button v-if="sel.status === 'queued'" class="kt-btn kt-btn--secondary btn-sm danger" @click="askRemove(sel, $event)"><iconify-icon icon="carbon:close"></iconify-icon>Remove from queue…</button>
+              <button v-if="sel.status === 'failed'" class="kt-btn kt-btn--secondary btn-sm" @click="retry(sel)"><iconify-icon icon="carbon:renew"></iconify-icon>Retry</button>
+              <button class="kt-btn kt-btn--secondary btn-sm" @click="openNew($event, sel)"><iconify-icon icon="carbon:copy"></iconify-icon>Clone…</button>
+            </div>
+            <div class="detail-body">
+              <div v-if="sel.status === 'failed'" class="kt-banner fail-box" role="alert">
+                <iconify-icon icon="carbon:warning-filled"></iconify-icon>
+                <div class="grow"><b>Training stopped at step <span class="num">{{ fmtInt(sel.step) }}</span>.</b>
+                  The last checkpoint is step <span class="num">{{ fmtInt(lastCkpt(sel)) }}</span>; Retry resumes from there.<code>{{ sel.error }}</code></div>
+              </div>
+
+              <section class="kt-v2-card card" aria-label="Run facts">
+                <dl class="facts">
+                  <div><dt class="kt-section-title">Progress</dt><dd class="mono">{{ fmtInt(sel.step) }} / {{ fmtInt(sel.maxSteps) }} <span class="faint">steps</span></dd></div>
+                  <div><dt class="kt-section-title">{{ sel.status === 'running' ? 'Elapsed · ETA' : 'Elapsed' }}</dt><dd class="mono">{{ elapsedLabel(sel) }}<template v-if="sel.status === 'running'"> · {{ fmtDur((sel.maxSteps - sel.step) / sel.rate) }}</template></dd></div>
+                  <div class="wide"><div class="prog" :class="'tone-' + STATUS[sel.status].tone"><span class="bar"><i :style="{ width: pct(sel) + '%' }"></i></span><span class="v">{{ pct(sel) }}%</span></div></div>
+                  <div><dt class="kt-section-title">GPUs</dt><dd>{{ sel.gpuCount }}× {{ sel.gpuType }}<div class="meta truncate" :title="gpuNote(sel)">{{ gpuNote(sel) }}</div></dd></div>
+                  <div><dt class="kt-section-title">LR · batch</dt><dd class="mono">{{ sel.lr }} · {{ sel.batch }}</dd></div>
+                  <div class="wide"><dt class="kt-section-title">Dataset</dt><dd class="mono truncate" :title="sel.dataset">{{ sel.dataset }}</dd></div>
+                </dl>
+              </section>
+
+              <section class="kt-v2-card card" aria-labelledby="loss-h">
+                <div class="card-head"><iconify-icon icon="carbon:chart-line"></iconify-icon><h2 id="loss-h">Training loss</h2>
+                  <span class="grow"></span><span class="hint" title="Line is an exponential moving average (α 0.8, debiased); the faint line underneath is the raw loss.">EMA · raw underneath</span></div>
+                <template v-if="lossSummary">
+                  <div class="loss-tiles">
+                    <div><div class="kt-section-title">Current</div><div class="val">{{ fmtLoss(lossSummary.cur) }}</div><div class="note">step {{ fmtCompact(lossSummary.curStep) }}</div></div>
+                    <div><div class="kt-section-title">Best</div><div class="val">{{ fmtLoss(lossSummary.best) }}</div><div class="note">step {{ fmtCompact(lossSummary.bestStep) }}</div></div>
+                    <div><div class="kt-section-title">Δ last 10%</div>
+                      <div class="val" :class="lossSummary.delta < 0 ? 'delta-good' : 'delta-bad'">{{ lossSummary.delta < 0 ? '↓' : '↑' }} {{ Math.abs(lossSummary.deltaPct).toFixed(1) }}%</div>
+                      <div class="note">{{ lossSummary.delta < 0 ? 'still improving' : 'getting worse' }}</div></div>
+                  </div>
+                </template>
+                <loss-chart :points="lossPoints" :version="tickN" :max-steps="sel.maxSteps" :nan-step="sel.nanStep" :empty-text="sel.status === 'queued' ? 'No loss yet — the job has not started.' : 'Waiting for the first loss point…'"></loss-chart>
+              </section>
+
+              <section class="kt-v2-card card" aria-labelledby="log-h">
+                <div class="card-head"><iconify-icon icon="carbon:terminal"></iconify-icon><h2 id="log-h">Logs</h2>
+                  <span class="meta">{{ fmtInt(selLogs.length) }} lines</span><span class="grow"></span>
+                  <button class="icon-btn info" title="Jump to the latest line" aria-label="Jump to the latest line" @click="jumpToTail"><iconify-icon icon="carbon:arrow-down"></iconify-icon></button>
+                  <button class="icon-btn info" :title="copied ? 'Copied' : 'Copy all log lines'" :aria-label="copied ? 'Copied' : 'Copy all log lines'" @click="copyLogs">
+                    <iconify-icon :icon="copied ? 'carbon:checkmark' : 'carbon:copy'" :style="copied ? 'color:var(--kt-ok-text)' : ''"></iconify-icon></button>
+                </div>
+                <div class="log-wrap">
+                  <div class="log" ref="logEl" @scroll.passive="onLogScroll" tabindex="0" aria-label="Log output" role="log">
+                    <div v-if="!selLogs.length" class="state" style="padding:2rem 1rem"><p class="sub">No log output yet. Lines appear here once the job is allocated GPUs.</p></div>
+                    <div v-for="l in selLogs" :key="l.id" class="log-line" :class="l.lv"><span class="t">{{ l.t }}</span><span class="lv">{{ l.lv }}</span><span class="msg">{{ l.msg }}</span></div>
+                  </div>
+                  <transition name="fade"><button v-if="newCount > 0" class="new-pill" @click="jumpToTail"><iconify-icon icon="carbon:arrow-down"></iconify-icon>{{ newCount }} new</button></transition>
+                </div>
+                <div class="log-foot" role="status" aria-live="polite">
+                  <template v-if="sel.status === 'running' && conn === 'online'"><span class="working">⚙ <span class="kohaku-pulse">Streaming from {{ sel.gpus[0] ? sel.gpus[0].split(':')[0] : 'runner' }}…</span></span><span class="grow"></span><span v-if="!following">paused while you scroll up</span></template>
+                  <template v-else-if="sel.status === 'running'"><span>Stream paused — runner disconnected</span></template>
+                  <template v-else-if="sel.status === 'queued'"><span>Waiting for {{ sel.gpuCount }}× {{ sel.gpuType }} · position {{ queuePos(sel) }} in queue</span></template>
+                  <template v-else><span>Run ended · {{ sel.status === 'done' ? '✓ finished' : '✗ failed' }}</span></template>
+                </div>
+              </section>
+            </div>
+          </template>
+          <div v-else class="detail-empty">
+            <div class="state">
+              <span class="ico" aria-hidden="true"><iconify-icon icon="carbon:select-window"></iconify-icon></span>
+              <p class="title">Select a job to see its loss curve and logs.</p>
+              <p class="sub">Use <kbd>J</kbd> and <kbd>K</kbd> to move through the list.</p>
+            </div>
+          </div>
+        </aside>
+      </transition>
+    </div>
+
+    <footer v-if="!compact" class="statusbar">
+      <span class="kt-dot" :class="connChip.dot" aria-hidden="true"></span><span>runner-01</span><span class="sep"></span>
+      <span>scheduler v0.9.2</span><span class="sep"></span>
+      <span>{{ busyGpuIds.size }}/{{ GPUS.length }} GPUs busy</span>
+      <span class="grow"></span>
+      <span :class="{ warn: counts.queued > 0 }">{{ counts.queued }} queued</span><span class="sep"></span>
+      <span :title="'Last update ' + clock(lastSync)">synced {{ ago(lastSync) }}</span>
+    </footer>
+  </div>
+
+  <!-- ═══ New job dialog ═══ -->
+  <transition name="fade">
+    <div v-if="dlg.open" class="modal-scrim">
+      <form class="kt-v2-float kt-dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-h" ref="dlgEl" @keydown="trapFocus" @submit.prevent="submitNew" novalidate>
+        <div class="dlg-head">
+          <h2 id="dlg-h">{{ dlg.cloneOf ? 'Clone job' : 'New job' }}</h2>
+          <button type="button" class="icon-btn" title="Close (Esc)" aria-label="Close" @click="closeNew" :disabled="dlg.busy"><iconify-icon icon="carbon:close"></iconify-icon></button>
+        </div>
+        <div class="kt-dialog__body">
+          <div class="form-grid">
+            <div class="field wide">
+              <label for="f-name">Job name</label>
+              <input id="f-name" v-model.trim="form.name" class="kt-input mono" placeholder="e.g. qwen2.5-7b-lora-ja…" autocomplete="off" spellcheck="false" :aria-invalid="!!errors.name" aria-describedby="f-name-msg">
+              <span v-if="errors.name" id="f-name-msg" class="err"><iconify-icon icon="carbon:warning"></iconify-icon>{{ errors.name }}</span>
+              <span v-else id="f-name-msg" class="hint">Lowercase letters, digits, dot, dash and underscore. Used for the checkpoint folder.</span>
+            </div>
+            <div class="field">
+              <label for="f-model">Base model</label>
+              <div class="select-wrap"><select id="f-model" v-model="form.model" class="kt-input">
+                <option v-for="m in MODELS" :key="m">{{ m }}</option></select><iconify-icon icon="carbon:chevron-down"></iconify-icon></div>
+            </div>
+            <div class="field">
+              <label for="f-gputype">GPU type</label>
+              <div class="select-wrap"><select id="f-gputype" v-model="form.gpuType" class="kt-input">
+                <option value="A100 80GB">A100 80GB · gpu-01</option><option value="RTX 4090">RTX 4090 24GB · gpu-02</option></select><iconify-icon icon="carbon:chevron-down"></iconify-icon></div>
+            </div>
+            <div class="field wide">
+              <label for="f-data">Dataset path</label>
+              <input id="f-data" v-model.trim="form.dataset" class="kt-input mono" placeholder="/data/…" spellcheck="false" :aria-invalid="!!errors.dataset">
+              <span v-if="errors.dataset" class="err"><iconify-icon icon="carbon:warning"></iconify-icon>{{ errors.dataset }}</span>
+            </div>
+            <div class="field">
+              <span class="label" id="f-gpus-l">GPU count</span>
+              <div class="kt-seg" role="radiogroup" aria-labelledby="f-gpus-l">
+                <button type="button" v-for="n in [1, 2, 4]" :key="n" role="radio" :aria-checked="form.gpuCount === n" @click="form.gpuCount = n"><span class="num">{{ n }}</span>×</button>
+              </div>
+              <span class="hint" :style="freeFor(form.gpuType) < form.gpuCount ? 'color:var(--kt-attention-text)' : ''">
+                {{ freeFor(form.gpuType) }} of 4 free · {{ freeFor(form.gpuType) >= form.gpuCount ? 'starts right away' : 'waits in the queue' }}
+              </span>
+            </div>
+            <div class="field">
+              <span class="label" id="f-prio-l">Priority</span>
+              <div class="kt-seg" role="radiogroup" aria-labelledby="f-prio-l">
+                <button type="button" v-for="p in ['normal', 'high']" :key="p" role="radio" :aria-checked="form.priority === p" @click="form.priority = p">{{ p === 'high' ? 'High' : 'Normal' }}</button>
+              </div>
+              <span class="hint">High jumps ahead of normal jobs in the queue.</span>
+            </div>
+            <div class="field">
+              <label for="f-steps">Max steps</label>
+              <input id="f-steps" v-model="form.maxSteps" class="kt-input mono" inputmode="numeric" :aria-invalid="!!errors.maxSteps">
+              <span v-if="errors.maxSteps" class="err"><iconify-icon icon="carbon:warning"></iconify-icon>{{ errors.maxSteps }}</span>
+            </div>
+            <div class="field">
+              <label for="f-lr">Learning rate</label>
+              <input id="f-lr" v-model.trim="form.lr" class="kt-input mono" inputmode="decimal" spellcheck="false" :aria-invalid="!!errors.lr">
+              <span v-if="errors.lr" class="err"><iconify-icon icon="carbon:warning"></iconify-icon>{{ errors.lr }}</span>
+            </div>
+            <div class="field wide">
+              <label for="f-cmd">Command <span class="faint" style="font-weight:400">· optional</span></label>
+              <textarea id="f-cmd" v-model="form.cmd" class="kt-input mono" rows="3" spellcheck="false" :placeholder="'python train.py --config configs/' + (form.name || 'job') + '.yaml'"></textarea>
+              <span class="hint">Runs inside the job's container. Leave empty to use the base model's default trainer.</span>
+            </div>
+          </div>
+        </div>
+        <div class="dlg-foot">
+          <span class="note"><kbd>Esc</kbd> to cancel</span>
+          <button type="button" class="kt-btn kt-btn--ghost" @click="closeNew" :disabled="dlg.busy">Cancel</button>
+          <button type="submit" class="kt-btn kt-btn--primary" :disabled="dlg.busy">
+            <iconify-icon :icon="dlg.busy ? 'carbon:circle-dash' : 'carbon:play'" :class="{ spin: dlg.busy }"></iconify-icon>{{ dlg.busy ? 'Queuing…' : 'Queue job' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </transition>
+
+  <!-- ═══ Confirm (destructive only) ═══ -->
+  <transition name="fade">
+    <div v-if="confirmState" class="modal-scrim" style="z-index:55">
+      <div class="kt-v2-float kt-dialog sm" role="alertdialog" aria-modal="true" aria-labelledby="cf-h" aria-describedby="cf-b" ref="cfEl" @keydown="trapFocus">
+        <div class="dlg-head"><h2 id="cf-h">{{ confirmState.title }}</h2></div>
+        <div class="kt-dialog__body confirm-body" id="cf-b" v-html="confirmState.body"></div>
+        <div class="dlg-foot">
+          <button type="button" class="kt-btn kt-btn--ghost" @click="closeConfirm">Cancel</button>
+          <button type="button" class="kt-btn kt-btn--danger" ref="cfVerbEl" @click="runConfirm">{{ confirmState.verb }}</button>
+        </div>
+      </div>
+    </div>
+  </transition>
+
+  <!-- ═══ Toasts: action results only ═══ -->
+  <div class="toasts" role="status" aria-live="polite">
+    <transition-group name="fade">
+      <div v-for="t in toasts" :key="t.id" class="toast" :class="'tone-' + t.tone">
+        <iconify-icon :icon="t.icon"></iconify-icon><span class="grow">{{ t.text }}</span>
+        <button class="icon-btn" title="Dismiss" aria-label="Dismiss" @click="dismiss(t.id)"><iconify-icon icon="carbon:close"></iconify-icon></button>
+      </div>
+    </transition-group>
+  </div>
+</div>
+</script>
+
+<script type="text/x-template" id="tpl-chart">
+<div class="chart" ref="root" @pointermove="onMove" @pointerleave="hi = -1" @pointerdown="onMove">
+  <svg v-if="m" :width="w" :height="H" role="img" :aria-label="'Training loss over ' + m.pts.length + ' samples; latest smoothed value ' + m.ema[m.ema.length - 1].toFixed(3)">
+    <g class="grid"><line v-for="t in m.yt" :key="'g' + t.v" :x1="P.l" :x2="w - P.r" :y1="t.y" :y2="t.y"></line></g>
+    <g class="axis">
+      <text v-for="t in m.yt" :key="'y' + t.v" :x="P.l - 6" :y="t.y" text-anchor="end" dominant-baseline="middle">{{ t.label }}</text>
+      <text v-for="(t, i) in m.xt" :key="'x' + i" :x="t.x" :y="H - 4" :text-anchor="i === 0 ? 'start' : i === m.xt.length - 1 ? 'end' : 'middle'">{{ t.label }}</text>
+    </g>
+    <path class="ln-raw" :d="m.rawPath"></path>
+    <path class="ln-ema" :d="m.emaPath"></path>
+    <g v-if="m.nanX != null">
+      <line class="nan-rule" :x1="m.nanX" :x2="m.nanX" :y1="P.t + 8" :y2="H - P.b"></line>
+      <circle class="nan-dot" :cx="m.nanX" :cy="P.t + 3" r="4"></circle>
+      <text class="nan-lbl" :x="m.nanX - 8" :y="P.t + 6" text-anchor="end">NaN</text>
+    </g>
+    <g v-if="hi >= 0 && m.pts[hi]">
+      <line class="xhair" :x1="m.x(m.pts[hi].step)" :x2="m.x(m.pts[hi].step)" :y1="P.t" :y2="H - P.b"></line>
+      <circle class="hdot" :cx="m.x(m.pts[hi].step)" :cy="m.y(m.ema[hi])" r="4.5"></circle>
+    </g>
+  </svg>
+  <div v-else class="chart-empty">{{ emptyText }}</div>
+  <div v-if="m && hi >= 0 && m.pts[hi]" class="kt-v2-float chart-tip" :style="{ left: tipLeft + 'px' }">
+    <div class="faint">step <span class="num">{{ fmtInt(m.pts[hi].step) }}</span></div>
+    <div class="row"><span class="swatch"></span>loss (EMA)<b>{{ m.ema[hi].toFixed(3) }}</b></div>
+    <div class="row"><span class="swatch raw"></span>raw<b>{{ m.pts[hi].raw.toFixed(3) }}</b></div>
+  </div>
+</div>
+</script>
+
+<style>
+  .spin { animation: kt-spin 1s linear infinite; }
+  @keyframes kt-spin { to { transform: rotate(360deg); } }
+</style>
+
+<script>
+const { createApp, ref, reactive, computed, watch, onMounted, onBeforeUnmount, nextTick, markRaw } = Vue;
+
+/* ── One status vocabulary: status → gem, icon, word. ── */
+const STATUS = {
+  running: { label: "running", tone: "aquamarine", icon: "carbon:play-filled-alt", hint: "Training on its allocated GPUs now." },
+  queued:  { label: "queued",  tone: "amber",      icon: "carbon:time",            hint: "Waiting for enough free GPUs of its type." },
+  failed:  { label: "failed",  tone: "coral",      icon: "carbon:warning-filled",  hint: "Training stopped with an error. Retry resumes from the last checkpoint." },
+  done:    { label: "done",    tone: "sage",       icon: "carbon:checkmark",       hint: "Reached its max steps; the final checkpoint is saved." },
+};
+const FILTERS = [
+  { id: "all", label: "All" }, { id: "running", label: "Running" }, { id: "queued", label: "Queued" },
+  { id: "failed", label: "Failed" }, { id: "done", label: "Done" },
+];
+const THEMES = [
+  { id: "system", icon: "carbon:screen", title: "Follow the system theme" },
+  { id: "light", icon: "carbon:sun", title: "Light theme" },
+  { id: "dark", icon: "carbon:moon", title: "Dark theme" },
+];
+const MODELS = ["Qwen2.5-7B", "Llama-3-8B", "SDXL 1.0", "ViT-B/16", "Whisper small", "TinyLlama-1.1B", "Custom"];
+const GPUS = [
+  ...[0, 1, 2, 3].map((i) => ({ id: `gpu-01:${i}`, node: "gpu-01", model: "A100 80GB", mem: 80 })),
+  ...[0, 1, 2, 3].map((i) => ({ id: `gpu-02:${i}`, node: "gpu-02", model: "RTX 4090", mem: 24 })),
+];
+const NODES = [
+  { id: "gpu-01", model: "A100 80GB", gpus: GPUS.filter((g) => g.node === "gpu-01") },
+  { id: "gpu-02", model: "RTX 4090 24GB", gpus: GPUS.filter((g) => g.node === "gpu-02") },
+];
+
+/* ── Formatters: one module, created once. ── */
+const NF = new Intl.NumberFormat("en-US");
+const TF = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+const fmtInt = (n) => (Number.isFinite(n) ? NF.format(Math.floor(n)) : "—");
+const fmtLoss = (v) => (Number.isFinite(v) ? v.toFixed(3) : "—");
+const fmtCompact = (n) => (n >= 1000 ? (n / 1000).toFixed(n % 1000 === 0 ? 0 : 1) + "k" : String(Math.round(n)));
+function fmtDur(s) {
+  if (s == null || !Number.isFinite(s) || s < 0) return "—";
+  s = Math.floor(s);
+  if (s < 60) return s + "s";
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + "m " + String(s % 60).padStart(2, "0") + "s";
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + "h " + (m % 60) + "m";
+  return Math.floor(h / 24) + "d " + (h % 24) + "h";
+}
+const clock = (t) => (t ? TF.format(t) : "—");
+
+/* Seeded RNG so mock curves are stable across reloads. */
+function rng(seedStr) {
+  let a = 0; for (const c of seedStr) a = (a * 31 + c.charCodeAt(0)) | 0;
+  return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+function lossAt(j, s) {
+  let base = j.l0 * Math.exp(-s / j.tau) + j.lmin;
+  if (j.nanStep && s > j.nanStep * 0.82) base *= 1 + Math.pow((s - j.nanStep * 0.82) / (j.nanStep * 0.18), 3) * 1.6;
+  return base * (1 + (j._rnd() - 0.5) * 0.09);
+}
+function samplePoints(j) {
+  const every = j.maxSteps / 120;
+  while (j._next <= j.step) { j.points.push({ step: Math.round(j._next), raw: lossAt(j, j._next) }); j._next += every; }
+}
+
+/* Logs live outside reactivity; a tick counter tells Vue when to re-read. */
+let logSeq = 0;
+const logStore = new Map();
+function addLog(j, lv, msg, at) {
+  const arr = logStore.get(j.id) || []; logStore.set(j.id, arr);
+  arr.push(Object.freeze({ id: ++logSeq, t: clock(at || Date.now()), lv, msg }));
+  if (arr.length > 600) arr.splice(0, arr.length - 600);
+}
+function stepLine(j) {
+  const p = j.points[j.points.length - 1];
+  return `step ${fmtInt(j.step)}/${fmtInt(j.maxSteps)} · loss ${p ? p.raw.toFixed(4) : "—"} · lr ${j.lr} · ${(j.rate * (0.92 + j._rnd() * 0.16)).toFixed(2)} it/s`;
+}
+
+function makeJob(o) {
+  const j = Object.assign({ step: 0, elapsed: 0, gpus: [], error: null, nanStep: null, lr: "2e-5", batch: 32, priority: "normal", rate: 2, l0: 2, lmin: 1, tau: 2000, created: Date.now() }, o);
+  j._rnd = markRaw(rng(j.id));
+  j.points = markRaw([]);
+  j._next = 0;
+  samplePoints(j);
+  return j;
+}
+function seedJobs() {
+  const now = Date.now();
+  const jobs = [
+    makeJob({ id: "job-0148", name: "qwen2.5-7b-lora-zh-instruct", model: "Qwen2.5-7B", dataset: "/data/zh-instruct-v3/train.jsonl", gpuType: "A100 80GB", gpuCount: 2, gpus: ["gpu-01:0", "gpu-01:1"], status: "running", step: 6240, maxSteps: 10000, rate: 2.4, elapsed: 2 * 3600 + 43 * 60, l0: 1.6, lmin: 1.08, tau: 2200, lr: "1e-4", batch: 16 }),
+    makeJob({ id: "job-0149", name: "e5-embed-contrastive-tw", model: "Custom", dataset: "/data/tw-pairs-2026/", gpuType: "A100 80GB", gpuCount: 2, gpus: ["gpu-01:2", "gpu-01:3"], status: "running", step: 11800, maxSteps: 14000, rate: 4.1, elapsed: 3 * 3600 + 5 * 60, l0: 2.2, lmin: 0.42, tau: 3000, lr: "5e-5", batch: 512 }),
+    makeJob({ id: "job-0151", name: "sdxl-finetune-anime-v2", model: "SDXL 1.0", dataset: "/data/danbooru-2024-hq/", gpuType: "RTX 4090", gpuCount: 1, gpus: ["gpu-02:0"], status: "running", step: 1710, maxSteps: 5000, rate: 1.1, elapsed: 41 * 60 + 12, l0: 0.09, lmin: 0.082, tau: 1500, lr: "1e-5", batch: 4 }),
+    makeJob({ id: "job-0150", name: "vit-b16-imagenet-ablation-nodrop", model: "ViT-B/16", dataset: "/data/imagenet-1k/", gpuType: "RTX 4090", gpuCount: 2, gpus: ["gpu-02:1", "gpu-02:2"], status: "running", step: 28400, maxSteps: 30000, rate: 9.5, elapsed: 5 * 3600 + 2 * 60, l0: 5.6, lmin: 1.32, tau: 6000, lr: "3e-4", batch: 256 }),
+    makeJob({ id: "job-0152", name: "whisper-small-zh-tw", model: "Whisper small", dataset: "/data/common-voice-zh-tw/", gpuType: "A100 80GB", gpuCount: 2, status: "queued", maxSteps: 8000, created: now - 12 * 60e3, lr: "1e-5", batch: 64 }),
+    makeJob({ id: "job-0153", name: "llama3-8b-dpo-helpful", model: "Llama-3-8B", dataset: "/data/prefs/helpful-v2.parquet", gpuType: "A100 80GB", gpuCount: 4, status: "queued", maxSteps: 3000, created: now - 4 * 60e3, lr: "5e-7", batch: 8 }),
+    makeJob({ id: "job-0147", name: "tinyllama-pretrain-r3", model: "TinyLlama-1.1B", dataset: "/data/slimpajama-6b/", gpuType: "A100 80GB", gpuCount: 1, status: "failed", step: 3412, nanStep: 3412, maxSteps: 20000, elapsed: 3600 + 18 * 60, l0: 8.5, lmin: 2.4, tau: 900, lr: "4e-4", batch: 128,
+      error: "FloatingPointError: loss is NaN at step 3412 (grad_norm=inf)\n  stopped by nan_guard · train.py:212" }),
+    makeJob({ id: "job-0146", name: "kohaku-xl-delta-vae", model: "SDXL 1.0", dataset: "/data/vae-recon-1m/", gpuType: "RTX 4090", gpuCount: 1, status: "done", step: 12000, maxSteps: 12000, elapsed: 9 * 3600 + 12 * 60, l0: 0.05, lmin: 0.011, tau: 3000, lr: "1e-5", batch: 8 }),
+    makeJob({ id: "job-0144", name: "bert-base-ner-ontonotes", model: "Custom", dataset: "/data/ontonotes-5.0/", gpuType: "RTX 4090", gpuCount: 1, status: "done", step: 4000, maxSteps: 4000, elapsed: 38 * 60 + 40, l0: 2.1, lmin: 0.09, tau: 600, lr: "3e-5", batch: 32 }),
+  ];
+  // Back-fill plausible logs.
+  for (const j of jobs) {
+    if (j.status === "queued") continue;
+    const start = Date.now() - j.elapsed * 1000;
+    addLog(j, "INFO", `Allocated ${j.gpuCount}× ${j.gpuType} (${j.gpus.join(", ") || (j.gpuType === "A100 80GB" ? "gpu-01:0" : "gpu-02:3")})`, start);
+    addLog(j, "INFO", `Loading dataset ${j.dataset}`, start + 2000);
+    addLog(j, "INFO", `Model ${j.model} loaded · bf16 · ${j.gpuCount > 1 ? "DDP over " + j.gpuCount + " ranks" : "single device"}`, start + 9000);
+    const n = 40, span = j.elapsed * 1000;
+    for (let i = 1; i <= n; i++) {
+      const s = Math.floor((j.step * i) / n);
+      const p = j.points.find((q) => q.step >= s) || j.points[j.points.length - 1];
+      addLog(j, "INFO", `step ${fmtInt(s)}/${fmtInt(j.maxSteps)} · loss ${p ? p.raw.toFixed(4) : "—"} · lr ${j.lr} · ${j.rate.toFixed(2)} it/s`, start + (span * i) / n);
+      if (i % 13 === 0) addLog(j, "INFO", `Saved checkpoint step ${fmtInt(Math.floor(s / 500) * 500)} → /ckpt/${j.name}/`, start + (span * i) / n + 500);
+    }
+    if (j.status === "failed") {
+      addLog(j, "WARN", "grad_norm 412.7 exceeds clip 1.0 for 25 consecutive steps", start + span - 20000);
+      addLog(j, "ERROR", "FloatingPointError: loss is NaN at step 3412 (grad_norm=inf)", start + span);
+      addLog(j, "ERROR", "nan_guard: stopping run, last good checkpoint step 3,000", start + span + 100);
+    }
+    if (j.status === "done") addLog(j, "INFO", `Training complete · final checkpoint → /ckpt/${j.name}/final`, start + span);
+  }
+  return jobs;
+}
+
+/* ── Loss chart: single series (EMA) with the raw line under it at 30%. ── */
+function niceTicks(lo, hi, n) {
+  const raw = (hi - lo) / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), r = raw / mag;
+  const step = (r >= 5 ? 10 : r >= 2 ? 5 : r >= 1 ? 2 : 1) * mag;
+  const out = []; for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(+v.toFixed(10));
+  return { ticks: out, step };
+}
+const LossChart = {
+  template: "#tpl-chart",
+  props: { points: Array, version: Number, maxSteps: Number, nanStep: Number, emptyText: String },
+  setup(props) {
+    const root = ref(null), w = ref(400), H = 190, P = { l: 44, r: 12, t: 12, b: 22 }, hi = ref(-1);
+    let ro;
+    onMounted(() => { ro = new ResizeObserver((es) => { const cw = es[0].contentRect.width; if (cw > 0) w.value = Math.round(cw); }); ro.observe(root.value); });
+    onBeforeUnmount(() => ro && ro.disconnect());
+    const m = computed(() => {
+      props.version; // re-read when the tick advances
+      const pts = props.points || [];
+      if (pts.length < 2) return null;
+      const a = 0.8; let acc = 0;
+      const ema = pts.map((p, i) => { acc = a * acc + (1 - a) * p.raw; return acc / (1 - Math.pow(a, i + 1)); });
+      let lo = Infinity, hiV = -Infinity; for (const p of pts) { lo = Math.min(lo, p.raw); hiV = Math.max(hiV, p.raw); }
+      const pad = (hiV - lo) * 0.08 || 0.05; lo = Math.max(0, lo - pad); hiV += pad;
+      const iw = Math.max(40, w.value - P.l - P.r), ih = H - P.t - P.b, xMax = props.maxSteps;
+      const x = (s) => P.l + (s / xMax) * iw, y = (v) => P.t + (1 - (v - lo) / (hiV - lo)) * ih;
+      const path = (vals) => vals.map((v, i) => (i ? "L" : "M") + x(pts[i].step).toFixed(1) + " " + y(v).toFixed(1)).join("");
+      const { ticks, step } = niceTicks(lo, hiV, 4);
+      const dec = Math.max(0, -Math.floor(Math.log10(step)));
+      return {
+        pts, ema, x, y,
+        rawPath: path(pts.map((p) => p.raw)), emaPath: path(ema),
+        yt: ticks.map((v) => ({ v, y: y(v), label: v.toFixed(dec) })),
+        xt: [0, 0.25, 0.5, 0.75, 1].map((f) => ({ x: x(f * xMax), label: fmtCompact(f * xMax) })),
+        nanX: props.nanStep != null ? x(props.nanStep) : null,
+      };
+    });
+    function onMove(e) {
+      const mm = m.value; if (!mm || !root.value) return;
+      const r = root.value.getBoundingClientRect();
+      const s = ((e.clientX - r.left - 8 - P.l) / (w.value - P.l - P.r)) * props.maxSteps;
+      let best = -1, bd = Infinity;
+      mm.pts.forEach((p, i) => { const d = Math.abs(p.step - s); if (d < bd) { bd = d; best = i; } });
+      hi.value = bd < props.maxSteps * 0.06 ? best : -1;
+    }
+    const tipLeft = computed(() => {
+      const mm = m.value; if (!mm || hi.value < 0 || !mm.pts[hi.value]) return 0;
+      const px = mm.x(mm.pts[hi.value].step) + 8;
+      return px + 16 + 160 > w.value ? px - 168 : px + 16;
+    });
+    return { root, w, H, P, m, hi, onMove, tipLeft, fmtInt };
+  },
+};
+
+const StatusChip = {
+  props: { status: String },
+  computed: { s() { return STATUS[this.status]; } },
+  template: `<span class="kt-chip" :class="'kt-chip--' + s.tone" :title="s.hint"><iconify-icon :icon="s.icon"></iconify-icon>{{ s.label }}</span>`,
+};
+
+/* ── App ── */
+const app = createApp({
+  template: "#tpl-app",
+  setup() {
+    // Density: one signal. compact <768 ≤ regular <1280 ≤ expansive.
+    const mqC = matchMedia("(max-width: 767px)"), mqE = matchMedia("(min-width: 1280px)");
+    const compact = ref(mqC.matches), expansive = ref(mqE.matches);
+    const density = computed(() => (compact.value ? "compact" : expansive.value ? "expansive" : "regular"));
+    mqC.addEventListener("change", (e) => (compact.value = e.matches));
+    mqE.addEventListener("change", (e) => (expansive.value = e.matches));
+
+    // Theme: system | light | dark, stored with try/catch.
+    const mqDark = matchMedia("(prefers-color-scheme: dark)");
+    let stored = "system"; try { stored = localStorage.getItem("gpurunner.theme") || "system"; } catch (e) {}
+    const theme = ref(stored);
+    function applyTheme() {
+      const d = theme.value === "dark" || (theme.value === "system" && mqDark.matches);
+      document.documentElement.classList.toggle("dark", d);
+      document.documentElement.style.colorScheme = d ? "dark" : "light";
+    }
+    function setTheme(t) { theme.value = t; try { localStorage.setItem("gpurunner.theme", t); } catch (e) {} applyTheme(); }
+    mqDark.addEventListener("change", applyTheme);
+
+    // Data.
+    const jobs = reactive([]);
+    const loading = ref(true);
+    const stash = ref(null);
+    const tickN = ref(0);
+    const now = ref(Date.now());
+    const lastSync = ref(Date.now());
+    const view = ref("jobs");
+    const filter = ref("all");
+    const query = ref("");
+    const selectedId = ref(null);
+    const detailOpen = ref(false);
+    const drawer = ref(false);
+    const stats = reactive(Object.fromEntries(GPUS.map((g) => [g.id, { util: 0, mem: 0.4, temp: 34 }])));
+
+    const ORDER = { running: 0, queued: 1, failed: 2, done: 3 };
+    const sorted = computed(() => [...jobs].sort((a, b) => ORDER[a.status] - ORDER[b.status] || (a.status === "queued" ? queueKey(a) - queueKey(b) : b.created - a.created)));
+    const counts = computed(() => {
+      const c = { all: jobs.length, running: 0, queued: 0, failed: 0, done: 0 };
+      for (const j of jobs) c[j.status]++;
+      return c;
+    });
+    const filtered = computed(() => {
+      const q = query.value.trim().toLowerCase();
+      return sorted.value.filter((j) => (filter.value === "all" || j.status === filter.value) && (!q || (j.name + " " + j.id + " " + j.model).toLowerCase().includes(q)));
+    });
+    const runningJobs = computed(() => sorted.value.filter((j) => j.status === "running"));
+    const busyGpuIds = computed(() => new Set(runningJobs.value.flatMap((j) => j.gpus)));
+    const sel = computed(() => jobs.find((j) => j.id === selectedId.value) || null);
+    const detailVisible = computed(() => (density.value === "expansive" ? view.value === "jobs" && jobs.length > 0 : detailOpen.value && !!sel.value));
+
+    const queueKey = (j) => (j.priority === "high" ? 0 : 1e15) + j.created;
+    const queuePos = (j) => sorted.value.filter((q) => q.status === "queued").indexOf(j) + 1;
+    const pct = (j) => (j.status === "done" ? 100 : Math.min(100, Math.floor((j.step / j.maxSteps) * 100)));
+    const elapsedLabel = (j) => (j.status === "queued" ? "—" : fmtDur(j.elapsed));
+    const freeFor = (type) => GPUS.filter((g) => g.model === type && !busyGpuIds.value.has(g.id)).length;
+    const gpuNote = (j) => {
+      if (j.status === "running") return j.gpus.join(", ");
+      if (j.status === "queued") return `waiting · ${freeFor(j.gpuType)} of ${j.gpuCount} free · #${queuePos(j)} in queue`;
+      return "released";
+    };
+    const gpuJob = (g) => runningJobs.value.find((j) => j.gpus.includes(g.id)) || null;
+    const memPct = (g) => Math.round((stats[g.id].mem / g.mem) * 100);
+    const memTone = (g) => { const p = memPct(g); return p > 80 ? "coral" : p >= 60 ? "amber" : "sapphire"; };
+    const lastCkpt = (j) => Math.floor(j.step / 500) * 500;
+    const ago = (t) => { const s = Math.max(0, Math.round((now.value - t) / 1000)); return s < 5 ? "just now" : s < 60 ? s + "s ago" : fmtDur(s) + " ago"; };
+
+    const kpis = computed(() => {
+      const c = counts.value, q = sorted.value.filter((j) => j.status === "queued"), f = jobs.filter((j) => j.status === "failed");
+      const busy = busyGpuIds.value.size;
+      return [
+        { id: "run", filter: "running", label: "Running", icon: "carbon:play", value: c.running, note: c.running ? `on ${busy} GPU${busy === 1 ? "" : "s"}` : "nothing training", title: "Show running jobs" },
+        { id: "q", filter: "queued", label: "Queued", icon: "carbon:time", value: c.queued, note: q.length ? "next · " + q[0].name : "queue is empty", title: "Show queued jobs" },
+        { id: "gpu", filter: null, label: "GPUs busy", icon: "carbon:chip", value: busy, unit: "/ " + GPUS.length, note: `A100 ${4 - freeFor("A100 80GB")}/4 · 4090 ${4 - freeFor("RTX 4090")}/4`, title: "Open the GPU view" },
+        { id: "f", filter: "failed", label: "Failed", icon: "carbon:warning", value: c.failed, note: f.length ? f[0].name : "✓ none on this runner", title: "Show failed jobs" },
+      ];
+    });
+
+    // Loss summary for the selected job.
+    const lossPoints = computed(() => { tickN.value; return sel.value ? sel.value.points.slice() : []; });
+    const lossSummary = computed(() => {
+      const p = lossPoints.value; if (p.length < 4) return null;
+      let best = p[0]; for (const q of p) if (q.raw < best.raw) best = q;
+      const k = Math.max(2, Math.floor(p.length * 0.1));
+      const avg = (arr) => arr.reduce((s, q) => s + q.raw, 0) / arr.length;
+      const recent = avg(p.slice(-k)), prev = avg(p.slice(-2 * k, -k));
+      const cur = p[p.length - 1];
+      return { cur: cur.raw, curStep: cur.step, best: best.raw, bestStep: best.step, delta: recent - prev, deltaPct: ((recent - prev) / prev) * 100 };
+    });
+
+    // ── Log viewer: follow the tail within 32px, otherwise count new lines. ──
+    const logEl = ref(null);
+    const following = ref(true);
+    const newCount = ref(0);
+    const selLogs = computed(() => { tickN.value; return sel.value ? (logStore.get(sel.value.id) || []).slice() : []; });
+    function onLogScroll() {
+      const el = logEl.value; if (!el) return;
+      following.value = el.scrollHeight - el.scrollTop - el.clientHeight < 32;
+      if (following.value) newCount.value = 0;
+    }
+    function jumpToTail() { const el = logEl.value; if (el) el.scrollTop = el.scrollHeight; following.value = true; newCount.value = 0; }
+    let lastLogId = 0;
+    watch(selLogs, (lines) => {
+      const tail = lines.length ? lines[lines.length - 1].id : 0;
+      const added = lines.filter((l) => l.id > lastLogId).length;
+      lastLogId = tail;
+      if (following.value) requestAnimationFrame(() => { const el = logEl.value; if (el) el.scrollTop = el.scrollHeight; });
+      else newCount.value += added;
+    });
+    watch(selectedId, () => { following.value = true; newCount.value = 0; lastLogId = Infinity; nextTick(() => { lastLogId = selLogs.value.length ? selLogs.value[selLogs.value.length - 1].id : 0; jumpToTail(); }); });
+    const copied = ref(false);
+    async function copyLogs() {
+      const text = selLogs.value.map((l) => `${l.t} ${l.lv} ${l.msg}`).join("\n");
+      try { await navigator.clipboard.writeText(text); copied.value = true; setTimeout(() => (copied.value = false), 1500); toast("sage", "carbon:checkmark", `Copied ${fmtInt(selLogs.value.length)} log lines`); }
+      catch (e) { toast("coral", "carbon:warning", "Copy failed — select the lines and copy manually"); }
+    }
+
+    // ── Toasts ──
+    const toasts = reactive([]); let toastSeq = 0;
+    function toast(tone, icon, text) { const id = ++toastSeq; toasts.push({ id, tone, icon, text }); if (toasts.length > 6) toasts.shift(); setTimeout(() => dismiss(id), 6000); }
+    function dismiss(id) { const i = toasts.findIndex((t) => t.id === id); if (i >= 0) toasts.splice(i, 1); }
+
+    // ── Scheduler & simulated polling ──
+    function schedule() {
+      const queued = jobs.filter((j) => j.status === "queued").sort((a, b) => queueKey(a) - queueKey(b));
+      for (const j of queued) {
+        const used = new Set(jobs.filter((x) => x.status === "running").flatMap((x) => x.gpus));
+        const free = GPUS.filter((g) => g.model === j.gpuType && !used.has(g.id));
+        if (free.length >= j.gpuCount) {
+          j.gpus = free.slice(0, j.gpuCount).map((g) => g.id);
+          j.status = "running"; j.elapsed = 0;
+          addLog(j, "INFO", `Allocated ${j.gpuCount}× ${j.gpuType} (${j.gpus.join(", ")})`);
+          addLog(j, "INFO", `Loading dataset ${j.dataset}`);
+          addLog(j, "INFO", `Model ${j.model} loaded · bf16 · ${j.gpuCount > 1 ? "DDP over " + j.gpuCount + " ranks" : "single device"}`);
+        }
+      }
+    }
+    function refreshStats() {
+      for (const g of GPUS) {
+        const j = runningJobs.value.find((x) => x.gpus.includes(g.id));
+        const s = stats[g.id], r = Math.random();
+        if (j) { s.util = Math.round(86 + r * 13); s.mem = Math.min(g.mem, g.mem * (j.gpuType === "RTX 4090" ? 0.86 : 0.64) + r * 1.2); s.temp = Math.round(68 + r * 9); }
+        else { s.util = 0; s.mem = 0.4; s.temp = 33 + Math.round(r * 3); }
+      }
+    }
+    const conn = ref("online"), attempt = ref(0), connError = ref(""), retrying = ref(false);
+    let tickBusy = false;
+    function tick() {
+      now.value = Date.now();
+      if (conn.value !== "online" || document.hidden || tickBusy || loading.value) return;
+      tickBusy = true;
+      for (const j of jobs) {
+        if (j.status !== "running") continue;
+        j.elapsed += 1;
+        j.step = Math.min(j.maxSteps, j.step + j.rate * (0.85 + j._rnd() * 0.3));
+        samplePoints(j);
+        if (j._rnd() < 0.55) addLog(j, "INFO", stepLine(j));
+        if (j._rnd() < 0.015) addLog(j, "WARN", `dataloader worker ${Math.floor(j._rnd() * 8)} slow: batch took ${(1.5 + j._rnd() * 2).toFixed(1)}s`);
+        if (j.step >= j.maxSteps) { j.status = "done"; j.gpus = []; addLog(j, "INFO", `Training complete · final checkpoint → /ckpt/${j.name}/final`); }
+      }
+      schedule(); refreshStats();
+      lastSync.value = Date.now(); tickN.value++;
+      tickBusy = false;
+    }
+    let timer, connTimer;
+    function dropConnection() {
+      conn.value = "reconnecting"; attempt.value = 1;
+      clearInterval(connTimer);
+      connTimer = setInterval(() => {
+        if (attempt.value >= 3) { clearInterval(connTimer); conn.value = "offline"; connError.value = "GET http://10.0.0.12:8600/api/jobs → ECONNREFUSED (3 attempts, last at " + clock(Date.now()) + ")"; return; }
+        attempt.value++;
+      }, 2500);
+    }
+    function reconnect() {
+      retrying.value = true;
+      setTimeout(() => { retrying.value = false; conn.value = "online"; attempt.value = 0; tick(); toast("aquamarine", "carbon:checkmark", "Reconnected to runner-01"); }, 1200);
+    }
+    const connChip = computed(() => conn.value === "online"
+      ? { cls: "kt-chip--aquamarine", dot: "kt-dot--live", label: "connected", title: "Connected to runner-01 at 10.0.0.12:8600; updates every second." }
+      : conn.value === "reconnecting"
+        ? { cls: "kt-chip--amber", dot: "kt-dot--attention", label: "reconnecting", title: "Lost the connection to runner-01; retrying." }
+        : { cls: "kt-chip--coral", dot: "kt-dot--danger", label: "offline", title: "Could not reach runner-01. Data shown is the last snapshot." });
+
+    function toggleEmpty() {
+      if (stash.value) { jobs.push(...stash.value); stash.value = null; }
+      else { stash.value = jobs.splice(0, jobs.length); selectedId.value = null; detailOpen.value = false; }
+      refreshStats();
+    }
+
+    // ── Navigation & selection ──
+    function go(v) { view.value = v; drawer.value = false; }
+    let detailOpener = null;
+    function openJob(id, ev) {
+      view.value = "jobs"; drawer.value = false;
+      selectedId.value = id;
+      if (density.value !== "expansive") {
+        detailOpener = ev && ev.currentTarget ? ev.currentTarget : document.activeElement;
+        detailOpen.value = true;
+        nextTick(() => detailCloseEl.value && detailCloseEl.value.focus());
+      }
+    }
+    const detailCloseEl = ref(null);
+    function closeDetail() { detailOpen.value = false; const o = detailOpener; detailOpener = null; nextTick(() => o && o.isConnected && o.focus()); }
+    function setFilter(f) { filter.value = f; }
+    function onKpi(k) { if (!k.filter) go("gpus"); else setFilter(filter.value === k.filter ? "all" : k.filter); }
+    const searchEl = ref(null);
+    function onSearchEsc(e) { if (query.value) { e.preventDefault(); e.stopPropagation(); query.value = ""; } else e.target.blur(); }
+    const railEl = ref(null);
+    function openDrawer() { drawer.value = true; nextTick(() => { const b = railEl.value && railEl.value.querySelector("button"); b && b.focus(); }); }
+    watch(compact, (c) => { if (!c) drawer.value = false; });
+
+    // ── New job dialog ──
+    const dlg = reactive({ open: false, busy: false, cloneOf: null });
+    const blank = () => ({ name: "", model: MODELS[0], gpuType: "A100 80GB", dataset: "", gpuCount: 1, priority: "normal", maxSteps: "10000", lr: "2e-5", cmd: "" });
+    const form = reactive(blank());
+    const errors = reactive({});
+    const dlgEl = ref(null);
+    let dlgOpener = null;
+    function openNew(ev, from) {
+      dlgOpener = (ev && ev.currentTarget) || document.activeElement;
+      Object.assign(form, blank());
+      if (from) Object.assign(form, { name: from.name + "-2", model: from.model, gpuType: from.gpuType, dataset: from.dataset, gpuCount: from.gpuCount, priority: from.priority, maxSteps: String(from.maxSteps), lr: from.lr });
+      for (const k in errors) delete errors[k];
+      dlg.cloneOf = from ? from.id : null; dlg.open = true; dlg.busy = false; drawer.value = false;
+      nextTick(() => { const el = document.getElementById("f-name"); el && el.focus(); });
+    }
+    function closeNew() { if (dlg.busy) return; dlg.open = false; nextTick(() => dlgOpener && dlgOpener.isConnected && dlgOpener.focus()); }
+    function validate() {
+      for (const k in errors) delete errors[k];
+      if (!form.name) errors.name = "Give the job a name.";
+      else if (!/^[a-z0-9][a-z0-9._-]{2,63}$/.test(form.name)) errors.name = "Use 3–64 lowercase letters, digits, dot, dash or underscore, starting with a letter or digit.";
+      else if (jobs.some((j) => j.name === form.name)) errors.name = `A job named “${form.name}” already exists on this runner.`;
+      if (!form.dataset) errors.dataset = "Enter the dataset path on the runner.";
+      else if (!form.dataset.startsWith("/")) errors.dataset = "Use an absolute path on the runner, such as /data/my-set/.";
+      const ms = Number(String(form.maxSteps).replace(/[,_\s]/g, ""));
+      if (!Number.isInteger(ms) || ms < 1) errors.maxSteps = "Enter a whole number of steps, 1 or more.";
+      else if (ms > 10_000_000) errors.maxSteps = "That is more than 10,000,000 steps; split it into several runs.";
+      const lr = Number(form.lr);
+      if (!form.lr || !Number.isFinite(lr) || lr <= 0 || lr >= 1) errors.lr = "Enter a number between 0 and 1, such as 2e-5.";
+      return ["name", "dataset", "maxSteps", "lr"].filter((k) => errors[k]);
+    }
+    let jobSeq = 154;
+    function submitNew() {
+      const bad = validate();
+      if (bad.length) { const ids = { name: "f-name", dataset: "f-data", maxSteps: "f-steps", lr: "f-lr" }; document.getElementById(ids[bad[0]]).focus(); return; }
+      dlg.busy = true;
+      setTimeout(() => {
+        const maxSteps = Number(String(form.maxSteps).replace(/[,_\s]/g, ""));
+        const j = makeJob({ id: "job-0" + jobSeq++, name: form.name, model: form.model, dataset: form.dataset, gpuType: form.gpuType, gpuCount: form.gpuCount, priority: form.priority, status: "queued", maxSteps, lr: form.lr, batch: 32,
+          rate: form.gpuType === "A100 80GB" ? 3 * form.gpuCount : 1.5 * form.gpuCount, l0: 1.5 + Math.random(), lmin: 0.4 + Math.random() * 0.6, tau: maxSteps / 4 });
+        jobs.push(j); schedule(); refreshStats(); tickN.value++;
+        dlg.busy = false; dlg.open = false;
+        toast("iolite", "carbon:checkmark", j.status === "running" ? `Started ${j.name} on ${j.gpus.join(", ")}` : `Queued ${j.name} · position ${queuePos(j)}`);
+        if (filter.value !== "all" && filter.value !== j.status) filter.value = "all";
+        openJob(j.id);
+      }, 700);
+    }
+
+    // ── Confirms: destructive only, verb on the button ──
+    const confirmState = ref(null);
+    const cfEl = ref(null), cfVerbEl = ref(null);
+    let cfOpener = null;
+    function openConfirm(state, ev) { cfOpener = (ev && ev.currentTarget) || document.activeElement; confirmState.value = state; nextTick(() => cfVerbEl.value && cfVerbEl.value.focus()); }
+    function closeConfirm() { confirmState.value = null; nextTick(() => cfOpener && cfOpener.isConnected && cfOpener.focus()); }
+    function runConfirm() { const s = confirmState.value; confirmState.value = null; s.action(); nextTick(() => cfOpener && cfOpener.isConnected && cfOpener.focus()); }
+    function askStop(j, ev) {
+      openConfirm({ title: `Stop ${j.name}?`, verb: "Stop job",
+        body: `Training ends at step <b class="num">${fmtInt(j.step)}</b>. The last checkpoint (step <span class="num">${fmtInt(lastCkpt(j))}</span>) is kept; progress since then is lost. Its ${j.gpuCount} GPU${j.gpuCount > 1 ? "s go" : " goes"} to the next queued job.`,
+        action: () => { j.status = "failed"; j.error = "Stopped by user at step " + Math.floor(j.step); j.gpus = []; addLog(j, "WARN", "SIGTERM received · stopped by user"); schedule(); refreshStats(); tickN.value++; toast("warm", "carbon:stop", `Stopped ${j.name}`); } }, ev);
+    }
+    function askRemove(j, ev) {
+      openConfirm({ title: `Remove ${j.name} from the queue?`, verb: "Remove",
+        body: `It has not started, so no training is lost. To run it later, use <b>Clone</b> before removing or queue it again from New job.`,
+        action: () => { const i = jobs.indexOf(j); if (i >= 0) jobs.splice(i, 1); if (selectedId.value === j.id) { selectedId.value = null; detailOpen.value = false; } toast("warm", "carbon:close", `Removed ${j.name} from the queue`); } }, ev);
+    }
+    function retry(j) {
+      j.status = "queued"; j.error = null; j.nanStep = null; j.created = Date.now();
+      j.step = lastCkpt(j); j.points.splice(0, j.points.length); j._next = 0; samplePoints(j);
+      addLog(j, "INFO", `Requeued · resumes from checkpoint step ${fmtInt(j.step)}`);
+      schedule(); refreshStats(); tickN.value++;
+      toast("iolite", "carbon:renew", j.status === "running" ? `Restarted ${j.name} from step ${fmtInt(j.step)}` : `Requeued ${j.name} · position ${queuePos(j)}`);
+    }
+
+    // ── Focus trap for dialogs ──
+    function trapFocus(e) {
+      if (e.key !== "Tab") return;
+      const els = [...e.currentTarget.querySelectorAll('button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])')];
+      if (!els.length) return;
+      const first = els[0], last = els[els.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+
+    // ── Keyboard: Esc exits the innermost layer; single-key shortcuts ignore text fields. ──
+    function onKey(e) {
+      if (e.defaultPrevented || e.isComposing || e.keyCode === 229) return;
+      if (e.key === "Escape") {
+        if (confirmState.value) closeConfirm();
+        else if (dlg.open) closeNew();
+        else if (drawer.value) drawer.value = false;
+        else if (detailOpen.value && density.value !== "expansive") closeDetail();
+        else return;
+        e.preventDefault(); return;
+      }
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (confirmState.value || dlg.open) return;
+      const t = e.target;
+      if (t && t.closest && t.closest("input, textarea, select, [contenteditable]")) return;
+      const k = e.key.toLowerCase();
+      if (e.key === "/") { e.preventDefault(); view.value = "jobs"; nextTick(() => searchEl.value && searchEl.value.focus()); }
+      else if (k === "n") { e.preventDefault(); openNew(null); }
+      else if ((k === "j" || k === "k") && view.value === "jobs" && filtered.value.length) {
+        e.preventDefault();
+        const list = filtered.value, i = list.findIndex((j) => j.id === selectedId.value);
+        const ni = i < 0 ? 0 : Math.max(0, Math.min(list.length - 1, i + (k === "j" ? 1 : -1)));
+        selectedId.value = list[ni].id;
+        nextTick(() => { const row = document.querySelector('.jobs-table tr[aria-selected="true"]'); row && row.scrollIntoView({ block: "nearest" }); });
+      }
+    }
+
+    function onVisible() { if (!document.hidden) tick(); }
+    onMounted(() => {
+      applyTheme();
+      document.addEventListener("keydown", onKey);
+      document.addEventListener("visibilitychange", onVisible);
+      setTimeout(() => {
+        jobs.push(...seedJobs()); refreshStats(); loading.value = false; lastSync.value = Date.now();
+        if (expansive.value) selectedId.value = "job-0148";
+      }, 450);
+      timer = setInterval(tick, 1000);
+    });
+    onBeforeUnmount(() => { clearInterval(timer); clearInterval(connTimer); document.removeEventListener("keydown", onKey); document.removeEventListener("visibilitychange", onVisible); });
+
+    return {
+      STATUS, FILTERS, THEMES, MODELS, GPUS, NODES,
+      compact, density, theme, setTheme, jobs, loading, stash, tickN, lastSync, view, filter, query, selectedId, drawer, stats,
+      counts, filtered, runningJobs, busyGpuIds, sel, detailVisible, kpis, lossPoints, lossSummary,
+      pct, elapsedLabel, freeFor, gpuNote, gpuJob, memPct, memTone, lastCkpt, ago, queuePos,
+      fmtInt, fmtLoss, fmtDur, fmtCompact, clock,
+      logEl, following, newCount, selLogs, onLogScroll, jumpToTail, copied, copyLogs,
+      toasts, dismiss, conn, attempt, connError, retrying, connChip, dropConnection, reconnect, toggleEmpty,
+      go, onKpi, openJob, closeDetail, detailCloseEl, setFilter, searchEl, onSearchEsc, railEl, openDrawer,
+      dlg, form, errors, dlgEl, openNew, closeNew, submitNew,
+      confirmState, cfEl, cfVerbEl, closeConfirm, runConfirm, askStop, askRemove, retry, trapFocus,
+    };
+  },
+});
+app.config.compilerOptions.isCustomElement = (tag) => tag === "iconify-icon";
+app.component("loss-chart", LossChart);
+app.component("status-chip", StatusChip);
+app.mount("#app");
+</script>
+</body>
+</html>

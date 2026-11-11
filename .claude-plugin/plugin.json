@@ -1,0 +1,11 @@
+{
+  "name": "kohaku-frontend",
+  "description": "The Kohaku (KohakuBlueleaf / Kohaku-Lab) frontend design language as a skill: gemstone-on-warm-stone tokens, component recipes, density/touch rules, states & microcopy, streaming/chat, dataviz, docs and terminal UI conventions, plus a palette guard script.",
+  "version": "1.0.0",
+  "author": {
+    "name": "treeleaves30760"
+  },
+  "homepage": "https://github.com/treeleaves30760/kohaku-frontend-skill",
+  "repository": "https://github.com/treeleaves30760/kohaku-frontend-skill",
+  "keywords": ["design-system", "frontend", "ui", "ux", "vue", "unocss", "tailwind", "kohaku"]
+}

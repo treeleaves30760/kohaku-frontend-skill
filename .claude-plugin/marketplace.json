@@ -1,0 +1,13 @@
+{
+  "name": "kohaku-frontend-skill",
+  "owner": {
+    "name": "treeleaves30760"
+  },
+  "plugins": [
+    {
+      "name": "kohaku-frontend",
+      "source": "./",
+      "description": "Kohaku frontend design language: tokens, component recipes, UX rules and a palette guard."
+    }
+  ]
+}
