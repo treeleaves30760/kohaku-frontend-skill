@@ -1,6 +1,16 @@
 # Component recipes
 
-Class strings are UnoCSS/Tailwind (with the Kohaku preset). Plain-CSS equivalents are in `assets/base.css` (`.kt-btn--*`, `.kt-chip--*`, `.kt-dot--*`, `.kt-seg`, `.kt-input`, `.kt-banner`). Icons are Carbon (`i-carbon-*`, scale 1.2, `inline-block; vertical-align: middle`); in non-Uno stacks use `@iconify/vue` with `carbon:` names or lucide as the nearest substitute.
+Class strings are UnoCSS/Tailwind (with the Kohaku preset). Plain-CSS equivalents are in `assets/base.css` (`.kt-btn--*`, `.kt-chip--*`, `.kt-dot--*`, `.kt-seg`, `.kt-input`, `.kt-banner`, `.kt-dialog*`).
+
+Icons are **Carbon** everywhere:
+- UnoCSS: `i-carbon-*` (scale 1.2, `inline-block; vertical-align: middle`).
+- React/Vue/plain: `@iconify/react` / `@iconify/vue`, or the `<iconify-icon icon="carbon:checkmark">` web component, sized with CSS `font-size: 1.2em; vertical-align: middle`.
+- Lucide only if Carbon is unavailable.
+- Icon-only controls always get `aria-label`, and decorative icons get `aria-hidden="true"`.
+
+**What a small app needs.**
+- Required: the tokens, both themes, the four states, the phone layout, visible focus, a status line/bar when there is live state, and the review checklist.
+- Optional, add when the app grows: rail resize/collapse, the command palette (until then `Ctrl/⌘+K` can focus search), tab strips, split panes, density override, reading-size preference, render-cost windowing.
 
 ## Contents
 - Buttons · Icon buttons · Segmented control

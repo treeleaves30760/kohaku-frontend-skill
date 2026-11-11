@@ -188,7 +188,9 @@ select:focus-visible {
   box-shadow: var(--v2-float-shadow);
 }
 /* Line classes draw only on the sides you name (border-r etc.), so
-   width resets to 0 at zero specificity. */
+   width resets to 0 at zero specificity. In Tailwind projects prefer the
+   preset's `border-v2-line` / `border-v2-edge` colour utilities and don't put
+   these classes on elements that also carry Tailwind border-colour classes. */
 :where(.kt-v2-line, .kt-v2-edge) {
   border-width: 0;
   border-style: solid;
@@ -309,6 +311,15 @@ html.dark .kt-chip { color: var(--gem-text-dark); }
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--color-text-muted);
+}
+/* CJK has no case: uppercase + tracking just makes tiny text. Use a slightly
+   larger, bolder label with no tracking instead. */
+:lang(zh) .kt-section-title,
+:lang(ja) .kt-section-title,
+:lang(ko) .kt-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 .kt-input {

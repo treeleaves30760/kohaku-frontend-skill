@@ -125,6 +125,19 @@
   --kt-dur-fast: 0.15s;         /* colour / opacity / chevron */
   --kt-dur: 0.2s;               /* fade / slide transitions */
 
+  /* ── Syntax colours (code blocks, editors) ───────────────────────
+     Light background: the -shadow shades. Dark background (dark mode, or a
+     code block that stays dark in both themes — add .kt-code-dark): "lifted"
+     gems = color-mix(gem 70%, white). Do NOT use the -light shades on dark
+     code: they are near-white pastels and keywords become indistinguishable. */
+  --kt-syntax-keyword: var(--kt-color-taaffeite-shadow);
+  --kt-syntax-string: var(--kt-color-sage-shadow);
+  --kt-syntax-function: var(--kt-color-iolite);
+  --kt-syntax-number: var(--kt-color-coral-shadow);
+  --kt-syntax-variable: var(--kt-color-amber-shadow);
+  --kt-syntax-type: var(--kt-color-sapphire);
+  --kt-syntax-comment: var(--color-text-muted);
+
   /* ── Data viz (tuned per mode; validated for colour-vision deficiency) ── */
   --kt-chart-cat-1: #5a4fcf;
   --kt-chart-cat-2: #1f9a80;
@@ -160,6 +173,22 @@ html[data-kt-density="reading"] {
     --kt-fs-h2: 1.35rem;
     --kt-fs-h1: 1.6rem;
   }
+}
+
+html.dark,
+.kt-code-dark {
+  --kt-syntax-keyword: color-mix(in srgb, var(--kt-color-taaffeite) 70%, white);
+  --kt-syntax-string: color-mix(in srgb, var(--kt-color-sage) 70%, white);
+  --kt-syntax-function: color-mix(in srgb, var(--kt-color-iolite) 70%, white);
+  --kt-syntax-number: color-mix(in srgb, var(--kt-color-coral) 70%, white);
+  --kt-syntax-variable: color-mix(in srgb, var(--kt-color-amber) 70%, white);
+  --kt-syntax-type: color-mix(in srgb, var(--kt-color-sapphire) 70%, white);
+  --kt-syntax-comment: #8a8078;
+}
+/* A code block that stays dark in both themes. */
+.kt-code-dark {
+  background: var(--kt-color-warm-950);
+  color: #e8e0d8;
 }
 
 html.dark {

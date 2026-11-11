@@ -4,8 +4,8 @@ Same tokens, reading-density tiers (`.kt-reading`: 16px body, 78ch measure). Avo
 
 ## Brand mark and wordmark
 
-- Kohaku-Lab products: the round mascot mark (bubble-tea Kohaku art over an `amber → iolite-light → iolite` gradient fallback) + a **two-tone wordmark**: `<b class="font-bold text-amber">Kohaku</b><span class="font-light text-iolite">Name</span>` (Togeari does the same split: `Toge` amber bold / `ari` iolite light), optional muted lowercase descriptor ("dashboard").
-- Other projects: the project's own mascot/character if it has one; otherwise a round 28px iolite mark with a white Carbon icon for the domain + the name in `text-sm font-semibold`. Split a compound name into two tones only if it reads naturally. No gradient-div logos, no cube icons, no emoji.
+- Kohaku-Lab products: the round mascot mark (bubble-tea Kohaku art over an `amber → iolite-light → iolite` gradient fallback) + a **two-tone wordmark**: `<b class="font-bold text-amber-shadow dark:text-amber">Kohaku</b><span class="font-light text-iolite dark:text-iolite-light">Name</span>` (Togeari does the same split: `Toge` amber bold / `ari` iolite light), optional muted lowercase descriptor ("dashboard"). The wordmark is the one place amber is brand rather than status. On a light rail use the amber `-shadow` shade, because amber DEFAULT is too faint there.
+- Other projects: don't use the Kohaku wordmark. Use the project's own mascot or character if it has one; otherwise a round 28px iolite mark with a white Carbon icon for the domain + the name in `text-sm font-semibold` (one tone). No gradient-div logos, no cube icons, no emoji.
 
 ## Landing / project home
 

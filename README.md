@@ -109,6 +109,11 @@ node skills/kohaku-frontend/scripts/check-palette.mjs path/to/src --allow src/fa
 <img src="docs/images/job-runner-phone-dark.png" width="260" alt="phone, dark">
 </p>
 
+第二個題目換成 React + Tailwind 的本機 LLM 聊天應用，用來測試 skill 能不能用在別的類型和技術棧：
+
+![local chat, light](docs/images/local-chat-desktop-light.png)
+![local chat settings, dark](docs/images/local-chat-settings-dark.png)
+
 **沒有 skill（baseline）：**
 
 ![baseline, light](docs/images/baseline-desktop-light.png)
@@ -126,6 +131,18 @@ REFACTOR 階段根據測試 agent 回報的模糊之處修補了 skill，包括�
 - 以容器寬度決定表格欄位，而不是用 viewport
 
 最後一項來自截圖：側邊面板打開時，job 名稱被擠成 "e5-e…"。
+
+第二輪（聊天應用）再補上：
+
+- 深色背景上的語法色改用 lifted gem，不用 `-light` 粉彩色
+- wordmark 的使用範圍
+- 聊天內文用的字級 tier
+- theme key 慣例和 URL 狀態 hook（`shots.mjs --states`）
+- CJK 的區段標籤
+- 失敗工具呼叫的單行摘要
+- 串流中的表格要正確呈現
+- 小型 app 的必要與可選元件
+- 用來分辨「重複脈動的指示點」和「單一工作中指示」的偵測邏輯
 
 範例原始碼在 [`examples/`](examples/)。
 

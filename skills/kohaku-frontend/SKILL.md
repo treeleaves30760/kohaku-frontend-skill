@@ -48,7 +48,7 @@ The UI language of KohakuBlueleaf's projects (KohakuTerrarium, Togeari, KohakuNo
 
 2. **Install the tokens** for the project's stack (copy from `assets/`, don't retype):
    - Vue + UnoCSS (the author's stack): `assets/uno.config.js` + `assets/tokens.css` + `assets/base.css`. Use Carbon icons (`@iconify-json/carbon`).
-   - Tailwind: `assets/tailwind.preset.js` (it replaces the default palette) + `tokens.css` + `base.css`.
+   - Tailwind: `assets/tailwind.preset.js` (it replaces the default palette) + `tokens.css` + `base.css`. For a single file using the Play CDN, set `tailwind.config = { darkMode: "class", theme: { colors: …, extend: … } }` inline, copying the preset's `theme` object.
    - Plain CSS / other frameworks: `tokens.css` + `base.css`, then use the `.kt-btn--*`, `.kt-chip--*`, `.kt-dot--*`, `.kt-seg`, `.kt-input`, `.kt-banner`, `.kt-v2-*` classes.
    - Load Inter and JetBrains Mono. Add an inline `<head>` script that applies `html.dark` from the stored preference or the system setting before first paint.
    - Existing project with its own brand: keep its hues, but map them onto the roles in `tokens.css` and adopt everything else.
@@ -61,9 +61,9 @@ The UI language of KohakuBlueleaf's projects (KohakuTerrarium, Togeari, KohakuNo
    ```
    Then screenshot each touched view in light and dark at about 1440px and about 390px wide, with touch emulated on the phone run:
    ```bash
-   npx -y -p playwright node <skill-dir>/scripts/shots.mjs http://localhost:5173/ shots/
+   npx -y -p playwright node <skill-dir>/scripts/shots.mjs http://localhost:5173/ shots/ --states "?view=settings,?drawer=1"
    ```
-   The script also flags infinite animations on an idle page, sideways scrolling and console errors. Open the PNGs and look at them, tab through the page with the keyboard, then walk `references/review-checklist.md`.
+   Give the app URL hooks for each non-initial state so `--states` can reach them. The script also flags pulsing indicators, sideways scrolling and console errors. Open the PNGs and look at them, tab through the page with the keyboard, then walk `references/review-checklist.md`.
 
 ## Quick reference
 

@@ -3,7 +3,7 @@
 // emulation on the phone run (so `pointer: coarse` rules apply), and report
 // anything animating on an idle page.
 //
-//   npx -y -p playwright node shots.mjs <url> [outDir] [--wait 800]
+//   npx -y -p playwright node shots.mjs <url> [outDir] [--wait 800] [--states '?view=settings,?drawer=1'] [--theme-key app.theme]
 //   (first run may need: npx playwright install chromium)
 //
 // Theme is forced by setting localStorage "theme" and the html.dark class
@@ -42,61 +42,93 @@ if (!pw) {
 const { chromium } = pw
 
 const args = process.argv.slice(2)
-const url = args.find((a) => !a.startsWith("--"))
+const opt = (name, fallback) => {
+  const i = args.indexOf(name)
+  return i >= 0 ? args[i + 1] : fallback
+}
+const positional = args.filter((a, i) => !a.startsWith("--") && !(i > 0 && args[i - 1].startsWith("--")))
+const url = positional[0]
 if (!url) {
-  console.error("usage: node shots.mjs <url> [outDir] [--wait ms]")
+  console.error("usage: node shots.mjs <url> [outDir] [--wait ms] [--states '?view=settings,#/new'] [--theme-key myapp.theme]")
   process.exit(2)
 }
-const outDir = args.filter((a) => !a.startsWith("--"))[1] || "shots"
-const waitIdx = args.indexOf("--wait")
-const wait = waitIdx >= 0 ? Number(args[waitIdx + 1]) : 800
-mkdirSync(outDir, { recursive: true })
+const outDir = positional[1] || "shots"
+const wait = Number(opt("--wait", 800))
+const themeKeys = ["theme", opt("--theme-key", null)].filter(Boolean)
+// Extra states reached by URL (query or hash). Give the app URL hooks for
+// non-initial states (?view=settings, ?drawer=1, ?demo=stream) — the KIR
+// editor does the same: URL params override saved prefs for one load.
+const states = ["", ...String(opt("--states", "")).split(",").map((s) => s.trim()).filter(Boolean)]
 
 const sizes = [
   { name: "desktop", viewport: { width: 1440, height: 900 }, isMobile: false, hasTouch: false, deviceScaleFactor: 1 },
   { name: "phone", viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 },
 ]
 
+const withState = (base, st) => {
+  if (!st) return base
+  if (st.startsWith("#")) return base.replace(/#.*$/, "") + st
+  const u = new URL(base)
+  for (const [k, v] of new URLSearchParams(st.replace(/^\?/, ""))) u.searchParams.set(k, v)
+  return u.toString()
+}
+const slug = (st) => st.replace(/^[?#/]+/, "").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "default"
+
 const browser = await chromium.launch()
 let problems = 0
-for (const size of sizes) {
-  for (const theme of ["light", "dark"]) {
-    const ctx = await browser.newContext({ ...size, colorScheme: theme })
-    await ctx.addInitScript((t) => {
-      try {
-        localStorage.setItem("theme", t)
-      } catch {}
-      const apply = () => document.documentElement?.classList.toggle("dark", t === "dark")
-      if (document.documentElement) apply()
-      else new MutationObserver((_, obs) => document.documentElement && (apply(), obs.disconnect())).observe(document, { childList: true })
-    }, theme)
-    const page = await ctx.newPage()
-    const errors = []
-    page.on("pageerror", (e) => errors.push(e.message))
-    page.on("console", (m) => m.type() === "error" && errors.push(m.text()))
-    await page.goto(url, { waitUntil: "networkidle" })
-    await page.waitForTimeout(wait)
-    const file = join(outDir, `${size.name}-${theme}.png`)
-    await page.screenshot({ path: file, fullPage: false })
+for (const st of states) {
+  const dir = st ? join(outDir, slug(st)) : outDir
+  mkdirSync(dir, { recursive: true })
+  for (const size of sizes) {
+    for (const theme of ["light", "dark"]) {
+      const ctx = await browser.newContext({ ...size, colorScheme: theme })
+      await ctx.addInitScript(
+        ([t, keys]) => {
+          try {
+            for (const k of keys) localStorage.setItem(k, t)
+          } catch {}
+          const apply = () => document.documentElement?.classList.toggle("dark", t === "dark")
+          if (document.documentElement) apply()
+          else new MutationObserver((_, obs) => document.documentElement && (apply(), obs.disconnect())).observe(document, { childList: true })
+        },
+        [theme, themeKeys],
+      )
+      const page = await ctx.newPage()
+      const errors = []
+      page.on("pageerror", (e) => errors.push(e.message))
+      page.on("console", (m) => m.type() === "error" && errors.push(m.text()))
+      await page.goto(withState(url, st), { waitUntil: "networkidle" })
+      await page.waitForTimeout(wait)
+      const file = join(dir, `${size.name}-${theme}.png`)
+      await page.screenshot({ path: file, fullPage: false })
 
-    const report = await page.evaluate(() => {
-      const running = document
-        .getAnimations()
-        .filter((a) => a.playState === "running" && a.effect?.getComputedTiming().iterations === Infinity)
-        .map((a) => {
-          const el = a.effect.target
-          return `${el.tagName.toLowerCase()}${el.className && typeof el.className === "string" ? "." + el.className.trim().split(/\s+/).join(".") : ""}`
-        })
-      const sideways = document.documentElement.scrollWidth > window.innerWidth + 1
-      return { running, sideways }
-    })
-    const notes = []
-    if (report.running.length > 1) notes.push(`${report.running.length} infinite animations running: ${[...new Set(report.running)].slice(0, 6).join(", ")}`)
-    if (report.sideways) notes.push("page scrolls sideways")
-    if (errors.length) notes.push(`${errors.length} console error(s): ${errors[0]}`)
-    problems += notes.length
-    console.log(`${notes.length ? "!" : "✓"} ${file}${notes.length ? "  — " + notes.join(" · ") : ""}`)
-    await ctx.close()
+      const report = await page.evaluate(() => {
+        const infinite = document
+          .getAnimations()
+          .filter((a) => a.playState === "running" && a.effect?.getComputedTiming().iterations === Infinity)
+          .map((a) => {
+            const el = a.effect.target
+            const r = el.getBoundingClientRect()
+            const cls = typeof el.className === "string" && el.className.trim() ? "." + el.className.trim().split(/\s+/).slice(0, 3).join(".") : ""
+            return { name: el.tagName.toLowerCase() + cls, small: r.width <= 16 && r.height <= 16, visible: r.width > 0 && r.height > 0 }
+          })
+          .filter((a) => a.visible)
+        const sideways = document.documentElement.scrollWidth > window.innerWidth + 1
+        return { infinite, sideways }
+      })
+      const notes = []
+      // Allowed: one "working now" pulse, plus a spinner on an in-flight command.
+      // Flagged: repeated small animated indicators (pulsing dots), or more than 3 loops at once.
+      const smallLoops = report.infinite.filter((a) => a.small)
+      if (smallLoops.length >= 3) notes.push(`${smallLoops.length} small indicators animating (pulsing dots?): ${[...new Set(smallLoops.map((a) => a.name))].slice(0, 4).join(", ")}`)
+      else if (report.infinite.length > 3) notes.push(`${report.infinite.length} infinite animations: ${[...new Set(report.infinite.map((a) => a.name))].slice(0, 5).join(", ")}`)
+      if (report.sideways) notes.push("page scrolls sideways")
+      if (errors.length) notes.push(`${errors.length} console error(s): ${errors[0]}`)
+      problems += notes.length
+      const info = report.infinite.length && !notes.length ? `  (${report.infinite.length} loop(s): ${report.infinite.map((a) => a.name).join(", ")})` : ""
+      console.log(`${notes.length ? "!" : "✓"} ${file}${notes.length ? "  — " + notes.join(" · ") : info}`)
+      await ctx.close()
+    }
   }
 }
 await browser.close()

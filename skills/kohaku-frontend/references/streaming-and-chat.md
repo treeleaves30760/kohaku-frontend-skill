@@ -4,6 +4,8 @@ Read this when building a chat transcript, an agent console, a log tail, or anyt
 
 ## Transcript hierarchy
 
+- Text size: a transcript inside an app uses the **app body tier** (`--kt-fs-body`, 0.875rem; markdown line-height ~1.65) so it matches the surrounding chrome. Readers who want bigger text change the reading-size preference (root 14/16/18px), which scales everything together. Don't hard-code 16px in one pane. The reading preset is for docs pages.
+
 - **Muted chrome, loud content.** IDs, models, token counts, timestamps: `text-[10px]/[11px] font-mono text-warm-400/500`. The user's content and the answer are the darkest text on the page ("near black" `#24211d` light / `#f3efe9` dark).
 - **User** turn: right-aligned soft bubble (`bg-warm-50`/conversation surface, `rounded-xl`, `max-w: min(80%, 46rem)`), small muted author label above.
 - **Assistant** turn: **no bubble**, left, text directly on the canvas (`max-w: min(92%, 52rem)`). The model's output *is* the page.
@@ -22,7 +24,8 @@ Read this when building a chat transcript, an agent console, a log tail, or anyt
 │ expanded: output mono xs, pre-wrap, max-h-64 scroll  ·  "Output truncated · 12,345 bytes omitted" (amber-shadow)
 └
 ```
-- Status glyphs are text: running `⚙` amber (+ pulse), error `✗` coral, interrupted `○` amber, done `✓` sage. Batch header precedence: running > error > interrupted > done.
+- Status glyphs are text: running `⚙` amber, error `✗` coral, interrupted `○` amber, done `✓` sage. Batch header precedence: running > error > interrupted > done. If the transcript already has a pulsing "working now" line, keep the running glyph static (one pulse per concern).
+- Failed call, collapsed: the header keeps glyph · name · elapsed, and the args slot is replaced by the **error's first line** (coral, mono, truncated to ~80 chars, full text in `title`). If the args matter too, add a second coral line under the header. Full output appears on expand.
 - Args summary: `k=v` pairs, values cut at 50 chars, raw string args at 80.
 - ≥3 consecutive plain tool calls fold into one batch row ("N tool calls · read ×3, bash, +2 more" + per-status count chips); batch id derives from the first call so expansion survives streaming.
 - Reasoning: native `<details>` with an iolite tint; summary = "Thinking" + a **240-char single-line preview** (surrogate-safe); the full text mounts only while open (`max-height: 15rem; overflow-y: auto`).
@@ -63,7 +66,9 @@ Cap retained history (e.g. last 5,000 lines) and say so ("showing the last 5,000
 ## Markdown, code, math, media
 
 - `html: false`, `linkify: true`; links open outside the app; links from model output ask "Open this link?" in embedded UIs.
-- Code blocks: header row with lowercase language label + "Copy" (→ "Copied!" in sage for 1.5s) + optional "Open in canvas"; mono at a dedicated size token (~0.95rem, line-height 1.55); horizontal scroll inside the block. Chat code blocks may stay dark in both themes; docs code blocks use the warm code background with gem-tinted syntax.
+- Code blocks: header row with lowercase language label + "Copy" (→ "Copied!" in sage for 1.5s) + optional "Open in canvas"; mono at a dedicated size token (~0.95rem, line-height 1.55); horizontal scroll inside the block. Chat code blocks may stay dark in both themes (`.kt-code-dark`: warm-950 background, and the `--kt-syntax-*` vars switch to lifted gems). Docs code blocks use the warm code background. Never colour syntax on a dark background with the `-light` shades; they're pastels and keywords blur together.
+- Tables that are still streaming: render the rows received so far as a table once the header and separator lines have arrived, and hold back a partial last row. Don't show raw `| … |` text.
+- On load and on switching conversations, land on the newest message. Scroll after the content settles (a ResizeObserver or a second rAF), because markdown and images keep growing after the first paint.
 - Tables and KaTeX display blocks scroll horizontally on their own; inline code wraps (`overflow-wrap: anywhere`).
 - LaTeX robustness: normalise CRLF, strip invisible format chars, convert `\( \)`→`$ $` and `\[ \]`→`$$ $$`; on parse failure show raw LaTeX in a subdued dashed code style, details to the console.
 - Mermaid: render only closed, non-empty fences; lazy-load; cache SVG per (theme, source); `securityLevel: "strict"`; fall back to the code block.
@@ -79,7 +84,7 @@ Cap retained history (e.g. last 5,000 lines) and say so ("showing the last 5,000
 - Drafts persist per conversation/tab locally (never synced per keystroke).
 - Drag files: ring-iolite/40 on the shell + centred floating pill "Drop files to attach" over a `backdrop-blur-sm` iolite/5 veil.
 - Slash menu above the input: grouped headings (10px uppercase), `/name` mono + description, loading/error/"No matching commands" states, full combobox ARIA (`aria-activedescendant`).
-- Context meter: a small SVG ring coloured by the 60/80 thresholds; figures hidden under a container query when narrow.
+- Context meter: a small SVG ring coloured by the 60/80 thresholds, with figures next to it (`660 / 8.2K`) hidden by `@container (max-width: 30rem)` on the composer.
 - Message actions: 22×22 bordered icon buttons under the bubble, `hover-only-action`, static flow on touch. One button per action (no "Retry" next to "Regenerate"). Branch navigator `‹ 2/3 ›` only when siblings exist. Inline edit with "Ctrl/Cmd+Enter to rerun · Esc to cancel".
 
 ## Embedding the same transcript elsewhere

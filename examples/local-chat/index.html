@@ -1,0 +1,1494 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KohakuChat</title>
+<script>
+  // Apply the stored theme (or the system setting) before first paint, so there is no flash.
+  (function () {
+    var t = null;
+    try { t = localStorage.getItem("theme"); } catch (e) {}
+    var q = new URLSearchParams(location.search).get("theme");
+    if (q === "light" || q === "dark") t = q;
+    var dark = t === "dark" || (t !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    document.documentElement.classList.toggle("dark", dark);
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com/3.4.16"></script>
+<script>
+  // Kohaku Tailwind preset, inlined (replaces the default palette).
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      colors: {
+        transparent: "transparent",
+        current: "currentColor",
+        white: "#ffffff",
+        black: "#000000",
+        sapphire: { light: "#D6E3F8", DEFAULT: "#0F52BA", shadow: "#082567" },
+        aquamarine: { light: "#D4EDE8", DEFAULT: "#4C9989", shadow: "#1B6B5A" },
+        taaffeite: { light: "#E8D5ED", DEFAULT: "#A57EAE", shadow: "#6B4670" },
+        iolite: { light: "#DDD0F0", DEFAULT: "#5A4FCF", shadow: "#312A7A" },
+        amber: { light: "#F5E6C8", DEFAULT: "#D4920A", shadow: "#8B5E00" },
+        coral: { light: "#F5D5D5", DEFAULT: "#D46B6B", shadow: "#8B3A3A" },
+        sage: { light: "#D5E8DA", DEFAULT: "#5A9E6F", shadow: "#3A6B48" },
+        warm: {
+          50: "#F7F5F2", 100: "#EFECE7", 200: "#E0DBD4", 300: "#C5BFB7", 400: "#A09A92",
+          500: "#8A8480", 600: "#6A645F", 700: "#4A4540", 800: "#3A3632", 900: "#2A2724",
+          950: "#1A1816",
+        },
+      },
+      extend: {
+        fontFamily: {
+          sans: ["Inter", "system-ui", "-apple-system", "Segoe UI", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "sans-serif"],
+          mono: ["JetBrains Mono", "Fira Code", "ui-monospace", "Consolas", "monospace"],
+        },
+        fontSize: {
+          "kt-micro": "var(--kt-fs-micro)",
+          "kt-caption": "var(--kt-fs-caption)",
+          "kt-body": "var(--kt-fs-body)",
+          "kt-emphasis": "var(--kt-fs-emphasis)",
+          "kt-title": "var(--kt-fs-title)",
+          "kt-h2": "var(--kt-fs-h2)",
+          "kt-h1": "var(--kt-fs-h1)",
+        },
+        backgroundColor: {
+          "v2-rail": "var(--v2-rail)",
+          "v2-chrome": "var(--v2-chrome)",
+          "v2-canvas": "var(--v2-canvas)",
+          "v2-panel": "var(--v2-panel)",
+          "v2-card": "var(--v2-card)",
+          "v2-float": "var(--v2-float)",
+        },
+        borderColor: {
+          "v2-line": "var(--v2-line)",
+          "v2-edge": "var(--v2-line-strong)",
+        },
+        transitionDuration: { DEFAULT: "150ms" },
+      },
+    },
+  };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/iconify-icon@2.1.0/dist/iconify-icon.min.js"></script>
+<style>
+/* ===== tokens.css (Kohaku design tokens) ===== */
+:root {
+  --kt-color-sapphire-light: #d6e3f8;
+  --kt-color-sapphire: #0f52ba;
+  --kt-color-sapphire-shadow: #082567;
+  --kt-color-aquamarine-light: #d4ede8;
+  --kt-color-aquamarine: #4c9989;
+  --kt-color-aquamarine-shadow: #1b6b5a;
+  --kt-color-taaffeite-light: #e8d5ed;
+  --kt-color-taaffeite: #a57eae;
+  --kt-color-taaffeite-shadow: #6b4670;
+  --kt-color-iolite-light: #ddd0f0;
+  --kt-color-iolite: #5a4fcf;
+  --kt-color-iolite-shadow: #312a7a;
+  --kt-color-amber-light: #f5e6c8;
+  --kt-color-amber: #d4920a;
+  --kt-color-amber-shadow: #8b5e00;
+  --kt-color-coral-light: #f5d5d5;
+  --kt-color-coral: #d46b6b;
+  --kt-color-coral-shadow: #8b3a3a;
+  --kt-color-sage-light: #d5e8da;
+  --kt-color-sage: #5a9e6f;
+  --kt-color-sage-shadow: #3a6b48;
+
+  --kt-color-warm-50: #f7f5f2;
+  --kt-color-warm-100: #efece7;
+  --kt-color-warm-200: #e0dbd4;
+  --kt-color-warm-300: #c5bfb7;
+  --kt-color-warm-400: #a09a92;
+  --kt-color-warm-500: #8a8480;
+  --kt-color-warm-600: #6a645f;
+  --kt-color-warm-700: #4a4540;
+  --kt-color-warm-800: #3a3632;
+  --kt-color-warm-900: #2a2724;
+  --kt-color-warm-950: #1a1816;
+
+  --kt-accent: var(--kt-color-iolite);
+  --kt-accent-text: var(--kt-color-iolite);
+  --kt-live: var(--kt-color-aquamarine);
+  --kt-ok: var(--kt-color-sage);
+  --kt-attention: var(--kt-color-amber);
+  --kt-danger: var(--kt-color-coral);
+  --kt-info: var(--kt-color-sapphire);
+  --kt-entity: var(--kt-color-taaffeite);
+  --kt-neutral: var(--kt-color-warm-400);
+
+  --kt-fill-accent: var(--kt-color-iolite);
+  --kt-fill-info: var(--kt-color-sapphire);
+
+  --kt-ok-text: var(--kt-color-sage-shadow);
+  --kt-live-text: var(--kt-color-aquamarine-shadow);
+  --kt-attention-text: var(--kt-color-amber-shadow);
+  --kt-danger-text: var(--kt-color-coral);
+
+  --color-bg: #f2eee8;
+  --color-surface: #ffffff;
+  --color-surface-alt: #efebe5;
+  --color-border: #e5dfd7;
+  --color-text: #2e2a26;
+  --color-text-muted: #6c655d;
+  --color-text-faint: #8f8880;
+
+  --v2-rail: #dcd5cb;
+  --v2-chrome: #e3ddd5;
+  --v2-canvas: #fbfaf8;
+  --v2-panel: #f2eee8;
+  --v2-card: #ffffff;
+  --v2-card-shadow: 0 1px 2px rgb(40 34 28 / 0.05);
+  --v2-float: #ffffff;
+  --v2-float-shadow: 0 6px 20px rgb(30 24 18 / 0.14);
+  --v2-line: #e5dfd7;
+  --v2-line-strong: #cdc5ba;
+  --v2-hover: rgb(36 33 29 / 0.07);
+  --v2-ink: #24211d;
+  --v2-ink-2: #6c655d;
+  --v2-ink-3: #8f8880;
+
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "PingFang TC",
+    "Microsoft JhengHei", sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, "Cascadia Code", Consolas, monospace;
+
+  --kt-fs-micro: 0.65rem;
+  --kt-fs-caption: 0.75rem;
+  --kt-fs-body: 0.875rem;
+  --kt-fs-emphasis: 1rem;
+  --kt-fs-title: 1.125rem;
+  --kt-fs-h2: 1.25rem;
+  --kt-fs-h1: 1.5rem;
+
+  --kt-radius-control: 0.5rem;
+  --kt-radius-card: 0.75rem;
+  --kt-radius-pill: 9999px;
+  --kt-ease: ease;
+  --kt-dur-fast: 0.15s;
+  --kt-dur: 0.2s;
+
+  --kt-chart-cat-1: #5a4fcf;
+  --kt-chart-cat-2: #1f9a80;
+  --kt-chart-good: #3a8a55;
+  --kt-chart-warn: #b87a00;
+  --kt-chart-bad: #c24a4a;
+  --kt-chart-idle: #a09a92;
+  --kt-chart-axis: #77706a;
+  --kt-chart-grid: rgb(36 33 29 / 0.07);
+}
+.kt-reading,
+html[data-kt-density="reading"] {
+  --kt-fs-micro: 0.75rem;
+  --kt-fs-caption: 0.875rem;
+  --kt-fs-body: 1rem;
+  --kt-fs-emphasis: 1.125rem;
+  --kt-fs-title: 1.375rem;
+  --kt-fs-h2: 1.75rem;
+  --kt-fs-h1: 2.5rem;
+  --kt-measure: min(78ch, 100%);
+}
+@media (pointer: coarse) {
+  :root {
+    --kt-fs-micro: 0.75rem;
+    --kt-fs-caption: 0.85rem;
+    --kt-fs-body: 1rem;
+    --kt-fs-emphasis: 1.05rem;
+    --kt-fs-title: 1.2rem;
+    --kt-fs-h2: 1.35rem;
+    --kt-fs-h1: 1.6rem;
+  }
+}
+html.dark {
+  --kt-accent-text: var(--kt-color-iolite-light);
+  --kt-ok-text: var(--kt-color-sage-light);
+  --kt-live-text: var(--kt-color-aquamarine-light);
+  --kt-attention-text: var(--kt-color-amber-light);
+  --kt-danger-text: var(--kt-color-coral-light);
+  --kt-fill-accent: #8b83db;
+  --kt-fill-info: #6f9be0;
+
+  --color-bg: #1a1816;
+  --color-surface: #252220;
+  --color-surface-alt: #1e1c1a;
+  --color-border: #3d3835;
+  --color-text: #e8e0d8;
+  --color-text-muted: #8a8078;
+  --color-text-faint: #5a5550;
+
+  --v2-rail: #161412;
+  --v2-chrome: #1a1816;
+  --v2-canvas: #221f1d;
+  --v2-panel: #2a2724;
+  --v2-card: #2a2724;
+  --v2-card-shadow: none;
+  --v2-float: #2e2b28;
+  --v2-float-shadow: 0 6px 20px rgb(0 0 0 / 0.35);
+  --v2-line: #3a3632;
+  --v2-line-strong: #4a4540;
+  --v2-hover: rgb(255 255 255 / 0.05);
+  --v2-ink: #f3efe9;
+  --v2-ink-2: #a39a91;
+  --v2-ink-3: #6f6760;
+
+  --kt-chart-cat-1: #8076e6;
+  --kt-chart-cat-2: #25a88e;
+  --kt-chart-good: #6db585;
+  --kt-chart-warn: #d9a23a;
+  --kt-chart-bad: #e07a7a;
+  --kt-chart-idle: #6a645f;
+  --kt-chart-axis: #8a8078;
+  --kt-chart-grid: rgb(255 255 255 / 0.06);
+}
+
+/* ===== base.css (Kohaku base layer) ===== */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+button { background: transparent; border: none; color: inherit; font: inherit; cursor: pointer; appearance: none; }
+select, input, textarea { font: inherit; color: inherit; }
+html {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  height: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  overflow-x: hidden;
+  touch-action: manipulation;
+}
+body { height: 100%; overflow-x: hidden; }
+code, pre, kbd, .font-mono, .num { font-family: var(--font-mono); }
+.num { font-variant-numeric: tabular-nums; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-text-muted); }
+.scrollbar-none { scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
+:focus-visible { outline: 2px solid var(--kt-accent); outline-offset: 2px; }
+input:focus-visible, textarea:focus-visible, select:focus-visible { outline: none; }
+:where(html:not(.dark)) .text-warm-400 { color: #77706a; }
+:where(html:not(.dark)) .text-warm-500 { color: #655e57; }
+.kt-text-micro { font-size: var(--kt-fs-micro); }
+.kt-text-caption { font-size: var(--kt-fs-caption); }
+.kt-text-body { font-size: var(--kt-fs-body); }
+.kt-text-emphasis { font-size: var(--kt-fs-emphasis); }
+.kt-text-title { font-size: var(--kt-fs-title); }
+.kt-text-h2 { font-size: var(--kt-fs-h2); }
+.kt-text-h1 { font-size: var(--kt-fs-h1); }
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  textarea, select, [contenteditable="true"] { font-size: max(16px, 1rem) !important; }
+}
+.hover-only-action { opacity: 0; transition: opacity var(--kt-dur-fast) var(--kt-ease); }
+.group:hover .hover-only-action, .group:focus-within .hover-only-action, .group.is-selected .hover-only-action { opacity: 1; }
+@media (pointer: coarse) { .hover-only-action { opacity: 1; } }
+@keyframes kt-pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+.kohaku-pulse { animation: kt-pulse 1.5s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+.kt-v2-rail { background: var(--v2-rail); }
+.kt-v2-chrome { background: var(--v2-chrome); }
+.kt-v2-canvas { background: var(--v2-canvas); }
+.kt-v2-panel { background: var(--v2-panel); }
+.kt-v2-card { background: var(--v2-card); border: 1px solid var(--v2-line); border-radius: var(--kt-radius-card); box-shadow: var(--v2-card-shadow); }
+.kt-v2-float { background: var(--v2-float); border: 1px solid var(--v2-line); border-radius: var(--kt-radius-card); box-shadow: var(--v2-float-shadow); }
+:where(.kt-v2-line, .kt-v2-edge) { border-width: 0; border-style: solid; }
+.kt-v2-line { border-color: var(--v2-line); }
+.kt-v2-edge { border-color: var(--v2-line-strong); }
+.kt-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem;
+  height: 2rem; padding: 0 0.75rem; border-radius: var(--kt-radius-control);
+  font-size: var(--kt-fs-body); font-weight: 500; white-space: nowrap; user-select: none;
+  transition: background-color var(--kt-dur-fast), border-color var(--kt-dur-fast), color var(--kt-dur-fast);
+}
+.kt-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.kt-btn--primary { background: var(--kt-color-iolite); color: #fff; }
+.kt-btn--primary:hover:not(:disabled) { background: var(--kt-color-iolite-shadow); }
+.kt-btn--danger { background: var(--kt-color-coral); color: #fff; }
+.kt-btn--danger:hover:not(:disabled) { background: var(--kt-color-coral-shadow); }
+.kt-btn--secondary { background: var(--v2-panel); border: 1px solid var(--v2-line-strong); color: var(--color-text); }
+.kt-btn--secondary:hover:not(:disabled) { border-color: color-mix(in srgb, var(--kt-color-iolite) 50%, transparent); }
+.kt-btn--ghost { color: var(--kt-color-warm-600); }
+.kt-btn--ghost:hover:not(:disabled) { background: var(--v2-hover); }
+.kt-btn--sm { height: 1.75rem; padding: 0 0.625rem; font-size: var(--kt-fs-caption); }
+.kt-btn--icon { width: 2rem; padding: 0; color: var(--kt-color-warm-600); }
+.kt-btn--icon.kt-btn--sm { width: 1.75rem; }
+.kt-btn--icon:hover:not(:disabled) { background: var(--v2-hover); color: var(--color-text); }
+html.dark .kt-btn--ghost, html.dark .kt-btn--icon { color: var(--kt-color-warm-400); }
+@media (pointer: coarse) {
+  .kt-btn { min-height: 2.5rem; }
+  .kt-btn--icon { min-width: 2.5rem; }
+}
+.kt-chip {
+  --gem: var(--kt-color-warm-500);
+  --gem-text: var(--kt-color-warm-700);
+  --gem-text-dark: var(--kt-color-warm-200);
+  display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.125rem 0.375rem;
+  border-radius: var(--kt-radius-pill); font-size: 11px; line-height: 1;
+  border: 1px solid color-mix(in srgb, var(--gem) 40%, transparent);
+  background: color-mix(in srgb, var(--gem) 10%, transparent);
+  color: var(--gem-text);
+}
+html.dark .kt-chip { color: var(--gem-text-dark); }
+.kt-chip--iolite { --gem: var(--kt-color-iolite); --gem-text: var(--kt-color-iolite); --gem-text-dark: var(--kt-color-iolite-light); }
+.kt-chip--aquamarine { --gem: var(--kt-color-aquamarine); --gem-text: var(--kt-color-aquamarine-shadow); --gem-text-dark: var(--kt-color-aquamarine-light); }
+.kt-chip--sage { --gem: var(--kt-color-sage); --gem-text: var(--kt-color-sage-shadow); --gem-text-dark: var(--kt-color-sage-light); }
+.kt-chip--amber { --gem: var(--kt-color-amber); --gem-text: var(--kt-color-amber-shadow); --gem-text-dark: var(--kt-color-amber-light); }
+.kt-chip--coral { --gem: var(--kt-color-coral); --gem-text: var(--kt-color-coral-shadow); --gem-text-dark: var(--kt-color-coral-light); }
+.kt-chip--sapphire { --gem: var(--kt-color-sapphire); --gem-text: var(--kt-color-sapphire); --gem-text-dark: var(--kt-color-sapphire-light); }
+.kt-chip--taaffeite { --gem: var(--kt-color-taaffeite); --gem-text: var(--kt-color-taaffeite-shadow); --gem-text-dark: var(--kt-color-taaffeite-light); }
+.kt-dot { display: inline-block; width: 0.5rem; height: 0.5rem; border-radius: 9999px; background: var(--kt-neutral); flex-shrink: 0; }
+.kt-dot--live { background: var(--kt-live); }
+.kt-dot--ok { background: var(--kt-ok); }
+.kt-dot--attention { background: var(--kt-attention); }
+.kt-dot--danger { background: var(--kt-danger); }
+.kt-section-title { font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-muted); }
+.kt-input {
+  width: 100%; height: 2rem; padding: 0 0.625rem; border-radius: var(--kt-radius-control);
+  background: var(--v2-card); border: 1px solid var(--v2-line-strong); font-size: var(--kt-fs-body);
+  transition: border-color var(--kt-dur-fast), box-shadow var(--kt-dur-fast);
+}
+.kt-input::placeholder { color: var(--color-text-faint); }
+.kt-input:focus { outline: none; border-color: var(--kt-color-iolite); box-shadow: 0 0 0 2px color-mix(in srgb, var(--kt-color-iolite) 22%, transparent); }
+.kt-input[aria-invalid="true"] { border-color: var(--kt-color-coral); }
+.kt-seg { display: inline-flex; padding: 0.125rem; gap: 0.125rem; border-radius: var(--kt-radius-control); background: color-mix(in srgb, var(--kt-color-warm-200) 50%, transparent); }
+html.dark .kt-seg { background: color-mix(in srgb, var(--kt-color-warm-800) 70%, transparent); }
+.kt-seg > button { height: 1.5rem; padding: 0 0.5rem; border-radius: 0.375rem; font-size: 11px; color: var(--v2-ink-2); }
+.kt-seg > button[aria-checked="true"], .kt-seg > button[aria-pressed="true"] { background: var(--v2-card); color: var(--v2-ink); font-weight: 500; box-shadow: 0 1px 2px rgb(0 0 0 / 0.08); }
+.kt-banner {
+  --gem: var(--kt-color-coral);
+  display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.5rem 0.75rem; border-radius: var(--kt-radius-control);
+  border: 1px solid color-mix(in srgb, var(--gem) 30%, transparent);
+  background: color-mix(in srgb, var(--gem) 10%, transparent);
+  font-size: var(--kt-fs-body);
+}
+.kt-banner--attention { --gem: var(--kt-color-amber); }
+.kt-banner--ok { --gem: var(--kt-color-sage); }
+.kt-banner--info { --gem: var(--kt-color-iolite); }
+
+/* ===== app layer (tokens only) ===== */
+html, body, #root { height: 100%; }
+body { background: var(--v2-canvas); }
+iconify-icon { display: inline-block; width: 1.2em; height: 1.2em; vertical-align: middle; flex-shrink: 0; }
+.ink { color: var(--v2-ink); }
+.ink-2 { color: var(--v2-ink-2); }
+.ink-3 { color: var(--v2-ink-3); }
+.c-accent { color: var(--kt-accent-text); }
+.c-ok { color: var(--kt-ok-text); }
+.c-danger { color: var(--kt-danger); }
+.c-attention { color: var(--kt-attention-text); }
+
+/* Icon button: 28px, 40px on touch. */
+.ib {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.75rem; height: 1.75rem; border-radius: var(--kt-radius-control);
+  color: var(--v2-ink-2); font-size: var(--kt-fs-body);
+  transition: background-color var(--kt-dur-fast), color var(--kt-dur-fast);
+}
+.ib:hover { background: var(--v2-hover); color: var(--v2-ink); }
+@media (pointer: coarse) { .ib { width: 2.5rem; height: 2.5rem; font-size: 1.125rem; } }
+
+/* Rail item. */
+.rail-item {
+  display: flex; align-items: center; gap: 0.625rem; width: 100%;
+  min-height: 2.25rem; padding: 0.25rem 0.75rem; border-radius: var(--kt-radius-control);
+  font-size: var(--kt-fs-body); color: var(--v2-ink-2); text-align: left;
+  transition: background-color var(--kt-dur-fast), color var(--kt-dur-fast);
+}
+.rail-item:hover { background: color-mix(in srgb, var(--kt-color-warm-300) 50%, transparent); color: var(--v2-ink); }
+html.dark .rail-item:hover { background: color-mix(in srgb, var(--kt-color-warm-700) 50%, transparent); }
+.rail-item[aria-current="page"] { background: color-mix(in srgb, var(--kt-color-warm-300) 55%, transparent); color: var(--v2-ink); font-weight: 500; }
+html.dark .rail-item[aria-current="page"] { background: color-mix(in srgb, var(--kt-color-warm-700) 55%, transparent); }
+@media (pointer: coarse) { .rail-item { min-height: 2.75rem; } .rail-item:active { background: color-mix(in srgb, var(--kt-color-warm-300) 60%, transparent); } }
+
+/* Composer shell: focus = border turns iolite/40, no glow. */
+.composer { background: var(--v2-card); border: 1px solid var(--v2-line-strong); border-radius: var(--kt-radius-card); transition: border-color var(--kt-dur-fast); }
+.composer:focus-within { border-color: color-mix(in srgb, var(--kt-color-iolite) 40%, transparent); }
+.composer textarea { resize: none; background: transparent; outline: none; width: 100%; max-height: 128px; font-size: var(--kt-fs-emphasis); line-height: 1.5; color: var(--v2-ink); }
+.composer textarea::placeholder { color: var(--color-text-faint); }
+
+/* Primary square that becomes Stop in the same slot. */
+.send-btn { width: 2rem; height: 2rem; border-radius: var(--kt-radius-control); display: inline-flex; align-items: center; justify-content: center; color: #fff; background: var(--kt-color-iolite); transition: background-color var(--kt-dur-fast); }
+.send-btn:hover:not(:disabled) { background: var(--kt-color-iolite-shadow); }
+.send-btn:disabled { background: transparent; color: var(--kt-color-warm-300); cursor: not-allowed; }
+html.dark .send-btn:disabled { color: var(--kt-color-warm-600); }
+.send-btn.is-stop { background: var(--kt-color-coral); }
+.send-btn.is-stop:hover { background: var(--kt-color-coral-shadow); }
+@media (pointer: coarse) { .send-btn { width: 2.5rem; height: 2.5rem; } }
+
+/* Transcript. */
+.col { width: 100%; max-width: 58rem; margin: 0 auto; }
+.user-bubble { margin-left: auto; max-width: min(80%, 46rem); background: var(--kt-color-warm-100); border: 1px solid var(--v2-line); border-radius: var(--kt-radius-card); color: var(--v2-ink); white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--kt-fs-emphasis); line-height: 1.6; }
+html.dark .user-bubble { background: var(--kt-color-warm-900); }
+.asst { max-width: min(92%, 52rem); }
+@media (max-width: 767px) { .asst { max-width: 100%; } .user-bubble { max-width: 88%; } }
+.msg-body { content-visibility: auto; contain-intrinsic-size: auto 6rem; }
+
+/* Markdown (assistant output). */
+.md { color: var(--v2-ink); font-size: var(--kt-fs-emphasis); line-height: 1.7; overflow-wrap: anywhere; }
+.md > * + * { margin-top: 0.7em; }
+.md h1 { font-size: 1.3em; font-weight: 600; line-height: 1.3; margin-top: 1.1em; }
+.md h2 { font-size: 1.15em; font-weight: 600; line-height: 1.35; margin-top: 1.1em; }
+.md h3 { font-size: 1.05em; font-weight: 600; line-height: 1.4; margin-top: 1.1em; }
+.md ul { list-style: disc; padding-left: 1.25rem; }
+.md ol { list-style: decimal; padding-left: 1.4rem; }
+.md li + li { margin-top: 0.25em; }
+.md a { color: var(--kt-accent-text); text-decoration: underline; text-underline-offset: 2px; }
+.md :not(pre) > code { font-size: 0.875em; padding: 0.1em 0.35em; border-radius: 0.3rem; background: color-mix(in srgb, var(--kt-color-warm-500) 14%, transparent); overflow-wrap: anywhere; word-break: break-word; }
+.md table { display: block; overflow-x: auto; max-width: 100%; border-collapse: collapse; font-size: var(--kt-fs-body); }
+.md th { font-weight: 500; color: var(--v2-ink-2); text-align: left; padding: 0.4rem 0.9rem 0.4rem 0; border-bottom: 1px solid var(--v2-line-strong); white-space: nowrap; }
+.md td { padding: 0.45rem 0.9rem 0.45rem 0; border-bottom: 1px solid var(--v2-line); white-space: nowrap; }
+.md tr:last-child td { border-bottom: 0; }
+
+/* Code block: stays dark in both themes; gem-tinted syntax. */
+.cb { background: var(--kt-color-warm-950); border: 1px solid var(--kt-color-warm-800); border-radius: var(--kt-radius-control); overflow: hidden; }
+.cb-head { display: flex; align-items: center; gap: 0.5rem; height: 2rem; padding: 0 0.375rem 0 0.75rem; background: var(--kt-color-warm-900); color: var(--kt-color-warm-400); font-size: var(--kt-fs-caption); }
+.cb-head button { display: inline-flex; align-items: center; gap: 0.25rem; height: 1.5rem; padding: 0 0.5rem; border-radius: 0.375rem; color: var(--kt-color-warm-300); }
+.cb-head button:hover { background: rgb(255 255 255 / 0.06); color: var(--kt-color-warm-100); }
+.cb-head button.is-copied { color: var(--kt-color-sage-light); }
+@media (pointer: coarse) { .cb-head { height: 2.5rem; } .cb-head button { height: 2.25rem; } }
+.cb pre { margin: 0; padding: 0.75rem 1rem; overflow-x: auto; font-size: 0.875rem; line-height: 1.55; color: var(--kt-color-warm-100); }
+.tk-kw { color: var(--kt-color-taaffeite); }
+.tk-str { color: var(--kt-color-sage); }
+.tk-num { color: var(--kt-color-coral); }
+.tk-fn { color: #8b83db; }
+.tk-com { color: var(--kt-color-warm-500); font-style: italic; }
+/* Quick-start prompt chip. */
+.qs-chip { min-height: 2rem; padding: 0.25rem 0.875rem; border-radius: var(--kt-radius-pill); border: 1px solid var(--v2-line-strong); background: var(--v2-card); color: var(--v2-ink-2); font-size: var(--kt-fs-caption); text-align: center; transition: border-color var(--kt-dur-fast), color var(--kt-dur-fast); }
+.qs-chip:hover { border-color: color-mix(in srgb, var(--kt-color-iolite) 50%, transparent); color: var(--kt-accent-text); }
+@media (pointer: coarse) { .qs-chip { min-height: 2.5rem; } }
+
+/* Tool call rows. */
+.tool { border: 1px solid color-mix(in srgb, var(--kt-color-sapphire) 20%, transparent); border-radius: var(--kt-radius-control); overflow: hidden; }
+.tool-head { display: flex; align-items: center; gap: 0.5rem; width: 100%; padding: 0.375rem 0.75rem; background: color-mix(in srgb, var(--kt-color-sapphire) 6%, transparent); font-size: var(--kt-fs-caption); cursor: pointer; text-align: left; transition: background-color var(--kt-dur-fast); }
+.tool-head:hover { background: color-mix(in srgb, var(--kt-color-sapphire) 10%, transparent); }
+@media (pointer: coarse) { .tool-head { min-height: 2.75rem; } }
+html.dark .tool { border-color: color-mix(in srgb, var(--kt-fill-info) 25%, transparent); }
+html.dark .tool-head { background: color-mix(in srgb, var(--kt-fill-info) 8%, transparent); }
+.tool-out { margin: 0; padding: 0.5rem 0.75rem; max-height: 16rem; overflow: auto; font-size: var(--kt-fs-caption); line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--v2-ink); background: var(--color-surface-alt); border-top: 1px solid var(--v2-line); }
+.chev { transition: transform var(--kt-dur-fast); }
+.chev.is-open { transform: rotate(90deg); color: var(--kt-accent-text); }
+
+/* Range slider. */
+.range { width: 100%; accent-color: var(--kt-color-iolite); }
+@media (pointer: coarse) { .range { height: 2rem; } }
+
+/* Drawer. */
+.drawer-enter { animation: drawer-in var(--kt-dur) var(--kt-ease); }
+@keyframes drawer-in { from { transform: translateX(-10px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+kbd { padding: 0.05rem 0.35rem; border-radius: 0.25rem; border: 1px solid var(--v2-line-strong); background: var(--v2-panel); font-size: var(--kt-fs-micro); }
+.safe-bottom { padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- Mock data kept out of the JS so code fences need no escaping. -->
+<script type="text/plain" id="reply-md">The server file looks right; the failure is only the missing Python binding. Install it, then stream tokens from the OpenAI-compatible endpoint the server exposes.
+
+### 1. Install the binding
+
+```bash
+pip install "llama-cpp-python[server]"
+python src/serve.py
+```
+
+### 2. Stream from the local server
+
+```python
+from openai import OpenAI
+
+client = OpenAI(base_url="http://127.0.0.1:8080/v1", api_key="local")
+
+stream = client.chat.completions.create(
+    model="qwen2.5-7b-instruct-q4_k_m",
+    messages=[{"role": "user", "content": "Hello"}],
+    temperature=0.7,
+    stream=True,
+)
+for chunk in stream:
+    # each chunk carries a few tokens
+    print(chunk.choices[0].delta.content or "", end="", flush=True)
+```
+
+### Which quantization to load
+
+| Quant | File size | RAM needed | Quality vs FP16 |
+|---|---:|---:|---|
+| Q4_K_M | 4.7 GB | 6.9 GB | about 97% |
+| Q5_K_M | 5.4 GB | 7.6 GB | about 98% |
+| Q8_0 | 8.1 GB | 10.3 GB | near lossless |
+
+- Start with **Q4_K_M** if the machine has 8 GB of RAM.
+- Keep `n_ctx` no higher than you need; the KV cache grows with it.</script>
+<script type="text/plain" id="tool-read">from llama_cpp.server.app import create_app
+from llama_cpp.server.settings import ModelSettings, ServerSettings
+import uvicorn
+
+model = ModelSettings(model="models/qwen2.5-7b-instruct-q4_k_m.gguf", n_ctx=8192)
+app = create_app(server_settings=ServerSettings(port=8080), model_settings=[model])
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="127.0.0.1", port=8080)</script>
+<script type="text/plain" id="tool-err">Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+ModuleNotFoundError: No module named 'llama_cpp'</script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef, useLayoutEffect, useMemo, useCallback } = React;
+
+/* ── Storage: localStorage, wrapped (private windows keep changes for the visit only) ── */
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (e) { return d; } },
+  set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} },
+};
+const params = new URLSearchParams(location.search);
+
+/* ── i18n: English is the source; zh-TW localised, not converted ── */
+const STRINGS = {
+  en: {
+    newChat: "New chat", search: "Search conversations…", today: "Today", earlier: "Earlier",
+    settings: "Settings", noConvs: "No conversations yet.", noConvsHint: "Start one with New chat.",
+    noMatch: "No conversations match “{q}”.", clearSearch: "Clear search",
+    emptyTitle: "What should {model} help with?",
+    emptyHint: "Runs on this machine — nothing leaves 127.0.0.1.",
+    kbdHint: "Enter to send · Shift+Enter for a new line",
+    placeholder: "Message {model}…", send: "Send message", stop: "Stop generating",
+    generating: "Generating…", running: "Running {name}…", tokens: "{n} tokens",
+    stopped: "Stopped — the partial reply is kept.", copy: "Copy", copied: "Copied",
+    copyFailed: "Copy failed — select and copy manually", copyReply: "Copy reply", regenerate: "Regenerate",
+    you: "You", newOutput: "New output", openMenu: "Open menu", closeMenu: "Close menu",
+    connected: "connected", toolOk: "done", toolError: "failed", toolRunning: "running", toolInterrupted: "interrupted",
+    noOutput: "No output.",
+    ctxTitle: "Context: {used} of {max} tokens ({pct}%)",
+    settingsTitle: "Settings", settingsHint: "Changes apply right away and are saved on this device.",
+    secModel: "Model", secModelHint: "What the local server runs, and how it samples.",
+    secAppearance: "Appearance", secAppearanceHint: "Theme and language of this app.",
+    model: "Model", modelHint: "Loaded by the server at 127.0.0.1:8080.",
+    temperature: "Temperature", temperatureHint: "Lower is more focused; higher is more varied.",
+    ctx: "Context length", ctxHint: "Set when the model is loaded.",
+    theme: "Theme", themeHint: "System follows your device setting.",
+    system: "System", light: "Light", dark: "Dark",
+    language: "Language", languageHint: "Conversations are never translated.",
+    back: "Back", startHint: "Try one of these",
+    q1: "Explain what a GGUF file contains", q2: "Write a Python script that streams from my local server", q3: "Compare Q4_K_M and Q8_0 quantization",
+    sendFirst: "Ask a question to start the conversation.",
+  },
+  "zh-TW": {
+    newChat: "新對話", search: "搜尋對話…", today: "今天", earlier: "更早",
+    settings: "設定", noConvs: "還沒有任何對話。", noConvsHint: "按「新對話」開始。",
+    noMatch: "沒有符合「{q}」的對話。", clearSearch: "清除搜尋",
+    emptyTitle: "要請 {model} 幫什麼忙？",
+    emptyHint: "在這台電腦上執行，資料不會離開 127.0.0.1。",
+    kbdHint: "Enter 送出 · Shift+Enter 換行",
+    placeholder: "傳訊息給 {model}…", send: "送出訊息", stop: "停止產生",
+    generating: "產生中…", running: "正在執行 {name}…", tokens: "{n} 個 token",
+    stopped: "已停止，保留目前的部分回覆。", copy: "複製", copied: "已複製",
+    copyFailed: "無法複製，請手動選取後複製", copyReply: "複製回覆", regenerate: "重新產生",
+    you: "你", newOutput: "有新內容", openMenu: "開啟選單", closeMenu: "關閉選單",
+    connected: "已連線", toolOk: "完成", toolError: "失敗", toolRunning: "執行中", toolInterrupted: "已中斷",
+    noOutput: "沒有輸出。",
+    ctxTitle: "上下文：已用 {used} / {max} 個 token（{pct}%）",
+    settingsTitle: "設定", settingsHint: "變更會立即套用，並儲存在這台裝置上。",
+    secModel: "模型", secModelHint: "本機伺服器執行的模型與取樣方式。",
+    secAppearance: "外觀", secAppearanceHint: "這個應用程式的主題與語言。",
+    model: "模型", modelHint: "由 127.0.0.1:8080 的伺服器載入。",
+    temperature: "溫度", temperatureHint: "數值越低越集中，越高越多變。",
+    ctx: "上下文長度", ctxHint: "於載入模型時設定。",
+    theme: "主題", themeHint: "「跟隨系統」會使用裝置的設定。",
+    system: "跟隨系統", light: "淺色", dark: "深色",
+    language: "語言", languageHint: "對話內容不會被翻譯。",
+    back: "返回", startHint: "可以試試這些",
+    q1: "說明 GGUF 檔案裡有什麼", q2: "寫一個從本機伺服器串流回覆的 Python 腳本", q3: "比較 Q4_K_M 與 Q8_0 量化",
+    sendFirst: "輸入問題來開始對話。",
+  },
+};
+const LANGS = [{ id: "en", label: "English" }, { id: "zh-TW", label: "繁體中文" }];
+const makeT = (lang) => (key, p = {}) => {
+  const s = (STRINGS[lang] && STRINGS[lang][key]) ?? STRINGS.en[key] ?? key;
+  return s.replace(/\{(\w+)\}/g, (_, k) => (p[k] ?? `{${k}}`));
+};
+
+/* ── Formatters (created once per locale) ── */
+const fmtCache = {};
+function fmt(lang) {
+  if (!fmtCache[lang]) fmtCache[lang] = {
+    num: new Intl.NumberFormat(lang),
+    rel: new Intl.RelativeTimeFormat(lang, { numeric: "auto", style: "short" }),
+    abs: new Intl.DateTimeFormat(lang, { dateStyle: "medium", timeStyle: "short" }),
+  };
+  return fmtCache[lang];
+}
+function relTime(ts, lang) {
+  const s = Math.round((ts - Date.now()) / 1000), f = fmt(lang).rel;
+  if (Math.abs(s) < 60) return f.format(s, "second");
+  if (Math.abs(s) < 3600) return f.format(Math.round(s / 60), "minute");
+  if (Math.abs(s) < 86400) return f.format(Math.round(s / 3600), "hour");
+  return f.format(Math.round(s / 86400), "day");
+}
+// Rail timestamps: compact ("4m", "2h", "3d"); the absolute time lives in title.
+function shortAgo(ts, lang) {
+  const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+  const zh = lang === "zh-TW";
+  if (s < 60) return zh ? "剛剛" : "now";
+  if (s < 3600) return `${Math.round(s / 60)}${zh ? " 分" : "m"}`;
+  if (s < 86400) return `${Math.round(s / 3600)}${zh ? " 小時" : "h"}`;
+  return `${Math.round(s / 86400)}${zh ? " 天" : "d"}`;
+}
+function dur(ms) {
+  if (ms == null || !isFinite(ms)) return "—";
+  if (ms < 1000) return `${Math.round(ms)} ms`;
+  if (ms < 60000) return `${(ms / 1000).toFixed(ms < 10000 ? 2 : 1)} s`;
+  const m = Math.floor(ms / 60000), s = Math.round((ms % 60000) / 1000);
+  return `${m}m ${String(s).padStart(2, "0")}s`;
+}
+const compact = (n) => n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K` : String(n);
+let uidN = 0;
+const uid = (p = "id") => `${p}-${Date.now().toString(36)}-${(uidN++).toString(36)}`;
+
+/* ── Mock models and seed data ── */
+const MODELS = [
+  { id: "qwen2.5-7b-instruct-q4_k_m", ctx: 8192 },
+  { id: "llama-3.1-8b-instruct-q5_k_m", ctx: 8192 },
+  { id: "mistral-nemo-12b-instruct-q4_k_m", ctx: 16384 },
+];
+const txt = (id) => document.getElementById(id).textContent;
+const REPLY_MD = txt("reply-md"), TOOL_READ = txt("tool-read"), TOOL_ERR = txt("tool-err");
+const SCRIPT = [
+  { type: "text", text: "Let me look at your server file and check that the binding imports." },
+  { type: "tool", name: "read_file", args: { path: "src/serve.py" }, ok: true, output: TOOL_READ, ms: 1100 },
+  { type: "tool", name: "run_python", args: { code: "import llama_cpp; print(llama_cpp.__version__)" }, ok: false, output: TOOL_ERR, ms: 840 },
+  { type: "text", text: REPLY_MD },
+];
+function completedParts() {
+  return SCRIPT.map((s, i) => s.type === "text"
+    ? { type: "text", id: `seed-p${i}`, text: s.text }
+    : { type: "tool", id: `seed-p${i}`, name: s.name, args: s.args, status: s.ok ? "ok" : "error", output: s.output, ms: s.ms });
+}
+const NOW = Date.now(), MIN = 60000, HOUR = 3600000, DAY = 86400000;
+function seed() {
+  return [
+    { id: "c1", title: "Serve a GGUF model with streaming", updated: NOW - 4 * MIN, messages: [
+      { id: "m1", role: "user", text: "How do I serve a GGUF model locally and stream the reply token by token? My serve.py won't start." },
+      { id: "m2", role: "assistant", parts: completedParts(), status: "done", model: MODELS[0].id, stats: { tokens: 412, elapsed: 10800 } },
+    ] },
+    { id: "c2", title: "KV cache quantization trade-offs", updated: NOW - 2 * HOUR, messages: [
+      { id: "m3", role: "user", text: "Is it worth quantizing the KV cache to q8_0?" },
+      { id: "m4", role: "assistant", parts: [{ type: "text", id: "p4", text: "Usually yes. A `q8_0` KV cache halves its memory with almost no quality loss, which lets you double `n_ctx` on the same GPU. Going down to `q4_0` saves more but starts to hurt long-context recall." }], status: "done", model: MODELS[0].id, stats: { tokens: 58, elapsed: 1600 } },
+    ] },
+    { id: "c3", title: "Regex for ISO 8601 dates", updated: NOW - 3 * DAY, messages: [
+      { id: "m5", role: "user", text: "Regex that matches 2026-11-12 but not 2026-13-40?" },
+      { id: "m6", role: "assistant", parts: [{ type: "text", id: "p6", text: "```regex\n^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$\n```\n\nIt checks month and day ranges, but not month lengths; validate `2026-02-31` with a date parser." }], status: "done", model: MODELS[1].id, stats: { tokens: 61, elapsed: 1900 } },
+    ] },
+    { id: "c4", title: "Summarize the llama.cpp server flags for batch size and threads", updated: NOW - 9 * DAY, messages: [
+      { id: "m7", role: "user", text: "Which llama.cpp server flags matter for throughput?" },
+      { id: "m8", role: "assistant", parts: [{ type: "text", id: "p8", text: "- `-t` threads: physical cores, not logical.\n- `-b` / `-ub` batch sizes: raise for prompt processing.\n- `-ngl` GPU layers: as many as fit in VRAM." }], status: "done", model: MODELS[0].id, stats: { tokens: 44, elapsed: 1300 } },
+    ] },
+  ];
+}
+
+/* ── Hooks ── */
+function useMedia(q) {
+  const [m, setM] = useState(() => window.matchMedia(q).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(q), on = () => setM(mq.matches);
+    mq.addEventListener("change", on); return () => mq.removeEventListener("change", on);
+  }, [q]);
+  return m;
+}
+
+/* ── Icons (Carbon via iconify) ── */
+const Icon = ({ name, className = "", label }) =>
+  <iconify-icon icon={`carbon:${name}`} class={className} aria-hidden={label ? undefined : "true"} aria-label={label}></iconify-icon>;
+
+/* ── Markdown: tiny strict renderer. Unclosed fences render as plain text while streaming. ── */
+function parseBlocks(src) {
+  const lines = src.split("\n"), out = [];
+  let i = 0;
+  const isList = (l) => /^\s*([-*]|\d+\.)\s/.test(l);
+  while (i < lines.length) {
+    const l = lines[i];
+    if (/^```/.test(l)) {
+      const lang = l.slice(3).trim(), buf = []; let closed = false; i++;
+      while (i < lines.length) { if (/^```\s*$/.test(lines[i])) { closed = true; i++; break; } buf.push(lines[i]); i++; }
+      out.push({ t: "code", lang, code: buf.join("\n"), closed }); continue;
+    }
+    const h = l.match(/^(#{1,3})\s+(.*)/);
+    if (h) { out.push({ t: "h", level: h[1].length, text: h[2] }); i++; continue; }
+    if (/^\s*\|/.test(l)) {
+      const rows = [];
+      while (i < lines.length && /^\s*\|/.test(lines[i])) rows.push(lines[i++]);
+      const cells = (r) => r.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+      if (rows.length >= 2 && /^[\s|:-]+$/.test(rows[1])) {
+        const aligns = cells(rows[1]).map((c) => (c.endsWith(":") ? "right" : "left"));
+        out.push({ t: "table", head: cells(rows[0]), aligns, body: rows.slice(2).map(cells) });
+      } else if (rows.length === 1 && i === lines.length) {
+        // Streaming: a lone header row at the tail is a table in progress, not a paragraph of pipes.
+        const head = cells(rows[0]).filter(Boolean);
+        out.push({ t: "table", head, aligns: head.map(() => "left"), body: [] });
+      } else out.push({ t: "p", text: rows.join(" ") });
+      continue;
+    }
+    if (isList(l)) {
+      const ordered = /^\s*\d+\./.test(l), items = [];
+      while (i < lines.length && isList(lines[i])) items.push(lines[i++].replace(/^\s*([-*]|\d+\.)\s+/, ""));
+      out.push({ t: ordered ? "ol" : "ul", items }); continue;
+    }
+    if (!l.trim()) { i++; continue; }
+    const buf = [];
+    while (i < lines.length && lines[i].trim() && !/^(```|#{1,3}\s|\s*\|)/.test(lines[i]) && !isList(lines[i])) buf.push(lines[i++]);
+    out.push({ t: "p", text: buf.join(" ") });
+  }
+  return out;
+}
+function inline(text, keyBase = "i") {
+  const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*|\[[^\]]+\]\([^)\s]+\))/g);
+  return parts.map((p, i) => {
+    const k = `${keyBase}-${i}`;
+    if (/^`[^`]+`$/.test(p)) return <code key={k}>{p.slice(1, -1)}</code>;
+    if (/^\*\*[^*]+\*\*$/.test(p)) return <strong key={k} className="font-semibold">{p.slice(2, -2)}</strong>;
+    const a = p.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/);
+    if (a) return <a key={k} href={a[2]} target="_blank" rel="noopener noreferrer">{a[1]}</a>;
+    return p;
+  });
+}
+const KW = "def|return|import|from|as|for|in|if|else|elif|with|async|await|True|False|None|class|while|pip|python";
+const TOKEN_RE = new RegExp(`(#[^\\n]*)|("(?:[^"\\\\\\n]|\\\\.)*"|'(?:[^'\\\\\\n]|\\\\.)*')|\\b(${KW})\\b|\\b(\\d+(?:\\.\\d+)?)\\b|([A-Za-z_]\\w*)(?=\\()`, "g");
+function highlight(code, lang) {
+  if (!/^(py|python|bash|sh|shell)$/.test(lang)) return code;
+  const out = []; let last = 0, m, n = 0;
+  TOKEN_RE.lastIndex = 0;
+  while ((m = TOKEN_RE.exec(code))) {
+    if (m.index > last) out.push(code.slice(last, m.index));
+    const cls = m[1] ? "tk-com" : m[2] ? "tk-str" : m[3] ? "tk-kw" : m[4] ? "tk-num" : "tk-fn";
+    out.push(<span key={n++} className={cls}>{m[0]}</span>);
+    last = m.index + m[0].length;
+  }
+  out.push(code.slice(last));
+  return out;
+}
+function CopyButton({ text, t, label }) {
+  const [state, setState] = useState("idle");
+  const timer = useRef();
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(text); setState("ok"); }
+    catch (e) { setState("fail"); }
+    clearTimeout(timer.current); timer.current = setTimeout(() => setState("idle"), 1500);
+  };
+  return (
+    <button type="button" onClick={copy} className={state === "ok" ? "is-copied" : ""} title={state === "fail" ? t("copyFailed") : label || t("copy")} aria-label={label || t("copy")}>
+      <Icon name={state === "ok" ? "checkmark" : "copy"} />
+      <span aria-live="polite">{state === "ok" ? t("copied") : state === "fail" ? t("copyFailed") : t("copy")}</span>
+    </button>
+  );
+}
+function CodeBlock({ b, t }) {
+  return (
+    <div className="cb">
+      <div className="cb-head">
+        <span className="font-mono lowercase flex-1">{b.lang || "text"}</span>
+        <CopyButton text={b.code} t={t} />
+      </div>
+      <pre><code>{b.closed ? highlight(b.code, b.lang) : b.code}</code></pre>
+    </div>
+  );
+}
+const isNumCell = (c) => /^[\d.,]+\s?(GB|MB|KB|%|ms|s)?$/.test(c);
+// Finished blocks are memoised by their source, so only the streaming tail re-renders.
+const MdBlock = React.memo(function MdBlock({ b, t }) {
+  switch (b.t) {
+    case "code": return <CodeBlock b={b} t={t} />;
+    case "h": { const H = `h${b.level}`; return <H>{inline(b.text)}</H>; }
+    case "ul": return <ul>{b.items.map((it, i) => <li key={i}>{inline(it, `li${i}`)}</li>)}</ul>;
+    case "ol": return <ol>{b.items.map((it, i) => <li key={i}>{inline(it, `li${i}`)}</li>)}</ol>;
+    case "table": return (
+      <table>
+        <thead><tr>{b.head.map((h, i) => <th key={i} style={{ textAlign: b.aligns[i] }}>{inline(h)}</th>)}</tr></thead>
+        <tbody>{b.body.map((r, ri) => <tr key={ri}>{r.map((c, ci) =>
+          <td key={ci} style={{ textAlign: b.aligns[ci] }} className={isNumCell(c) ? "num font-mono" : ""}>{inline(c, `c${ri}${ci}`)}</td>)}</tr>)}</tbody>
+      </table>
+    );
+    default: return <p>{inline(b.text)}</p>;
+  }
+}, (a, b) => JSON.stringify(a.b) === JSON.stringify(b.b) && a.t === b.t);
+function Markdown({ text, t }) {
+  const blocks = useMemo(() => parseBlocks(text), [text]);
+  return <div className="md">{blocks.map((b, i) => <MdBlock key={i} b={b} t={t} />)}</div>;
+}
+
+/* ── Tool call row ── */
+const TOOL_STATUS = {
+  running: { glyph: "⚙", cls: "c-attention", key: "toolRunning" },
+  ok: { glyph: "✓", cls: "c-ok", key: "toolOk" },
+  error: { glyph: "✗", cls: "c-danger", key: "toolError" },
+  interrupted: { glyph: "○", cls: "c-attention", key: "toolInterrupted" },
+};
+const cut = (s, n) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
+function ToolCall({ p, t }) {
+  const [open, setOpen] = useState(false);
+  const st = TOOL_STATUS[p.status];
+  const args = Object.entries(p.args).map(([k, v]) => `${k}=${cut(String(v), 50)}`).join(" ");
+  const errLine = p.status === "error" && p.output ? p.output.trim().split("\n").pop() : null;
+  const toggle = () => setOpen((o) => !o);
+  return (
+    <div className="tool">
+      <div className="tool-head" role="button" tabIndex={0} aria-expanded={open} onClick={toggle}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } }}
+        title={`${p.name} ${args}`}>
+        <span className={`${st.cls} font-mono w-3 text-center shrink-0`} role="img" aria-label={t(st.key)}>{st.glyph}</span>
+        <span className="font-mono font-semibold c-accent shrink-0">{p.name}</span>
+        <span className="font-mono ink-2 truncate flex-1 min-w-0">{args}</span>
+        {p.ms != null && <span className="font-mono num ink-2 shrink-0 kt-text-micro">{dur(p.ms)}</span>}
+        <Icon name="chevron-right" className={`chev ink-2 shrink-0 ${open ? "is-open" : ""}`} />
+      </div>
+      {errLine && !open && (
+        <div className="px-3 py-1.5 font-mono kt-text-caption c-danger truncate border-t kt-v2-line" title={errLine}>{cut(errLine, 80)}</div>
+      )}
+      {open && <pre className="tool-out font-mono">{p.output || t("noOutput")}</pre>}
+    </div>
+  );
+}
+
+/* ── Messages ── */
+function AssistantMessage({ m, t, lang, live, onRegenerate, canRegenerate }) {
+  const fullText = m.parts.filter((p) => p.type === "text").map((p) => p.text).join("\n\n");
+  const runningTool = m.parts.find((p) => p.type === "tool" && p.status === "running");
+  const tokens = m.stats?.tokens ?? 0, elapsed = m.stats?.elapsed ?? 0;
+  const rate = elapsed > 0 ? (tokens / (elapsed / 1000)).toFixed(1) : null;
+  const nf = fmt(lang).num;
+  return (
+    <div className="asst group msg-body">
+      <div className="flex flex-col gap-3">
+        {m.parts.map((p) => p.type === "tool"
+          ? <ToolCall key={p.id} p={p} t={t} />
+          : <Markdown key={p.id} text={p.text} t={t} />)}
+      </div>
+      {live && (
+        <div className="mt-3 kt-text-caption font-mono ink-2 kohaku-pulse" role="status" aria-live="polite">
+          {runningTool ? t("running", { name: runningTool.name }) : t("generating")} · {t("tokens", { n: nf.format(tokens) })}
+        </div>
+      )}
+      {m.status === "stopped" && (
+        <div className="mt-3 flex items-center gap-1.5 kt-text-caption c-attention" role="status">
+          <span className="font-mono" aria-hidden="true">○</span>{t("stopped")}
+        </div>
+      )}
+      {!live && (
+        <div className="mt-2 flex items-center gap-2 flex-wrap">
+          <span className="kt-text-micro font-mono num ink-2 min-w-0 truncate" title={m.model}>
+            {m.model} · {t("tokens", { n: nf.format(tokens) })}{rate ? ` · ${rate} tok/s` : ""} · {dur(elapsed)}
+          </span>
+          <span className="hover-only-action flex items-center gap-1">
+            <CopyIconButton text={fullText} t={t} />
+            {canRegenerate && (
+              <button type="button" className="ib" onClick={onRegenerate} title={t("regenerate")} aria-label={t("regenerate")}>
+                <Icon name="renew" />
+              </button>
+            )}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+function CopyIconButton({ text, t }) {
+  const [ok, setOk] = useState(false);
+  const timer = useRef();
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(text); setOk(true); } catch (e) { setOk(false); }
+    clearTimeout(timer.current); timer.current = setTimeout(() => setOk(false), 1500);
+  };
+  return (
+    <button type="button" className={`ib ${ok ? "c-ok" : ""}`} onClick={copy} title={ok ? t("copied") : t("copyReply")} aria-label={t("copyReply")}>
+      <Icon name={ok ? "checkmark" : "copy"} />
+    </button>
+  );
+}
+function UserMessage({ m, t }) {
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <span className="kt-text-caption ink-2">{t("you")}</span>
+      <div className="user-bubble px-4 py-2.5">{m.text}</div>
+    </div>
+  );
+}
+
+/* ── Composer: Enter sends (never during IME composition, never on touch); Send becomes Stop in the same slot ── */
+function ContextRing({ used, max, t, lang }) {
+  const pct = Math.min(100, Math.round((used / max) * 100));
+  const color = pct > 80 ? "var(--kt-color-coral)" : pct >= 60 ? "var(--kt-color-amber)" : "var(--kt-fill-accent)";
+  const r = 7, c = 2 * Math.PI * r;
+  const nf = fmt(lang).num;
+  const title = t("ctxTitle", { used: nf.format(used), max: nf.format(max), pct });
+  return (
+    <span className="inline-flex items-center gap-1.5 ink-2" title={title} role="img" aria-label={title}>
+      <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+        <circle cx="9" cy="9" r={r} fill="none" stroke="var(--v2-line-strong)" strokeWidth="2.5" />
+        <circle cx="9" cy="9" r={r} fill="none" stroke={color} strokeWidth="2.5" strokeDasharray={`${(pct / 100) * c} ${c}`} transform="rotate(-90 9 9)" strokeLinecap="round" />
+      </svg>
+      <span className="kt-text-micro font-mono num hidden sm:inline">{compact(used)} / {compact(max)}</span>
+    </span>
+  );
+}
+function Composer({ value, setValue, onSend, onStop, streaming, model, t, lang, ctxUsed, ctxMax, coarse, taRef }) {
+  useLayoutEffect(() => {
+    const ta = taRef.current; if (!ta) return;
+    ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 128) + "px";
+  }, [value]);
+  const canSend = value.trim().length > 0 && !streaming;
+  const onKeyDown = (e) => {
+    if (e.key !== "Enter" || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return;
+    if (e.nativeEvent.isComposing || e.keyCode === 229 || coarse) return;
+    e.preventDefault();
+    if (canSend) onSend();
+  };
+  return (
+    <div className="composer px-3 pt-2.5 pb-2">
+      <label htmlFor="composer-input" className="sr-only">{t("placeholder", { model })}</label>
+      <textarea id="composer-input" ref={taRef} rows={1} value={value} onChange={(e) => setValue(e.target.value)} onKeyDown={onKeyDown}
+        placeholder={t("placeholder", { model })} />
+      <div className="flex items-center gap-2 mt-1">
+        <span className="kt-chip font-mono truncate min-w-0" title={model}>{model}</span>
+        <span className="flex-1" />
+        <ContextRing used={ctxUsed} max={ctxMax} t={t} lang={lang} />
+        {streaming ? (
+          <button type="button" className="send-btn is-stop" onClick={onStop} title={t("stop")} aria-label={t("stop")}>
+            <Icon name="stop-filled-alt" />
+          </button>
+        ) : (
+          <button type="button" className="send-btn" onClick={onSend} disabled={!canSend}
+            title={canSend ? t("send") : t("sendFirst")} aria-label={t("send")}>
+            <Icon name="arrow-up" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Rail: brand · New chat · search · conversation list · settings ── */
+function Rail({ convs, activeId, view, onSelect, onNew, onSettings, query, setQuery, liveConvId, t, lang, searchRef, onClose }) {
+  const q = query.trim().toLowerCase();
+  const list = convs.filter((c) => !q || c.title.toLowerCase().includes(q)).sort((a, b) => b.updated - a.updated);
+  const startToday = new Date(); startToday.setHours(0, 0, 0, 0);
+  const groups = [
+    { key: "today", items: list.filter((c) => c.updated >= startToday.getTime()) },
+    { key: "earlier", items: list.filter((c) => c.updated < startToday.getTime()) },
+  ].filter((g) => g.items.length);
+  return (
+    <nav className="h-full flex flex-col bg-v2-rail" aria-label="Conversations">
+      <div className="h-12 md:h-11 px-3 flex items-center gap-2 shrink-0">
+        <span className="w-7 h-7 rounded-full bg-iolite text-white inline-flex items-center justify-center shrink-0" aria-hidden="true">
+          <Icon name="chat-bot" />
+        </span>
+        <span className="kt-text-body flex-1 truncate">
+          <b className="font-semibold text-amber-shadow dark:text-amber">Kohaku</b><span className="font-light text-iolite dark:text-iolite-light">Chat</span>
+        </span>
+        {onClose && (
+          <button type="button" className="ib" onClick={onClose} title={t("closeMenu")} aria-label={t("closeMenu")}><Icon name="close" /></button>
+        )}
+      </div>
+      <div className="px-3 pb-2 flex flex-col gap-2 shrink-0">
+        <button type="button" className="kt-btn kt-btn--primary w-full" onClick={onNew}>
+          <Icon name="add" />{t("newChat")}
+        </button>
+        <div className="relative">
+          <Icon name="search" className="absolute left-2.5 top-1/2 -translate-y-1/2 ink-2 pointer-events-none" />
+          <input ref={searchRef} type="search" className="kt-input pl-8" placeholder={t("search")} value={query} aria-label={t("search")}
+            onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape" && query) { e.stopPropagation(); setQuery(""); } }} />
+        </div>
+      </div>
+      <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-2">
+        {convs.length === 0 ? (
+          <div className="px-3 py-6 text-center kt-text-caption ink-2">
+            <Icon name="chat" className="kt-text-title opacity-60" />
+            <p className="mt-1">{t("noConvs")}</p><p>{t("noConvsHint")}</p>
+          </div>
+        ) : list.length === 0 ? (
+          <div className="px-3 py-6 text-center kt-text-caption ink-2">
+            <p>{t("noMatch", { q: query.trim() })}</p>
+            <button type="button" className="kt-btn kt-btn--ghost kt-btn--sm mt-2" onClick={() => setQuery("")}>{t("clearSearch")}</button>
+          </div>
+        ) : groups.map((g) => (
+          <div key={g.key} className="mt-2 first:mt-0">
+            <div className="flex items-center px-3 h-7 kt-section-title">
+              <span className="flex-1">{t(g.key)}</span><span className="font-mono num">{g.items.length}</span>
+            </div>
+            <ul>
+              {g.items.map((c) => {
+                const active = view === "chat" && c.id === activeId;
+                return (
+                  <li key={c.id}>
+                    <button type="button" className="rail-item" aria-current={active ? "page" : undefined} onClick={() => onSelect(c.id)} title={c.title}>
+                      <span className="truncate flex-1 min-w-0">{c.title || t("newChat")}</span>
+                      {liveConvId === c.id ? (
+                        <span className="kt-dot kt-dot--live" role="img" aria-label={t("generating")} title={t("generating")} />
+                      ) : (
+                        <span className="kt-text-micro font-mono num ink-2 shrink-0" title={`${relTime(c.updated, lang)} · ${fmt(lang).abs.format(c.updated)}`}>{shortAgo(c.updated, lang)}</span>
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </div>
+      <div className="px-2 py-2 border-t kt-v2-edge shrink-0 safe-bottom md:pb-2">
+        <button type="button" className="rail-item" aria-current={view === "settings" ? "page" : undefined} onClick={onSettings}>
+          <Icon name="settings" /><span className="flex-1">{t("settings")}</span>
+        </button>
+      </div>
+    </nav>
+  );
+}
+
+/* ── Settings: group > card > row. Wide: nav + content. Phone: list → page. ── */
+function Seg({ value, options, onChange, label }) {
+  return (
+    <div className="kt-seg" role="radiogroup" aria-label={label}>
+      {options.map((o) => (
+        <button key={o.id} type="button" role="radio" aria-checked={value === o.id} onClick={() => onChange(o.id)}
+          className="[@media(pointer:coarse)]:!h-9 [@media(pointer:coarse)]:!px-3">{o.label}</button>
+      ))}
+    </div>
+  );
+}
+function Row({ title, hint, children, stack }) {
+  return (
+    <div className={`px-4 py-3 flex gap-4 ${stack ? "flex-col sm:flex-row sm:items-center" : "items-center"}`}>
+      <div className="flex-1 min-w-0">
+        <div className="kt-text-body font-medium ink">{title}</div>
+        {hint && <div className="kt-text-caption ink-2 mt-0.5">{hint}</div>}
+      </div>
+      <div className="shrink-0">{children}</div>
+    </div>
+  );
+}
+function SettingsView({ prefs, setPref, t, lang, compactLayout, onOpenMenu }) {
+  const [section, setSection] = useState(compactLayout ? null : "model");
+  useEffect(() => { if (!compactLayout && !section) setSection("model"); }, [compactLayout]);
+  const SECTIONS = [
+    { id: "model", icon: "machine-learning-model", label: t("secModel"), hint: t("secModelHint"), summary: prefs.model },
+    { id: "appearance", icon: "color-palette", label: t("secAppearance"), hint: t("secAppearanceHint"),
+      summary: `${t(prefs.theme)} · ${LANGS.find((l) => l.id === prefs.lang).label}` },
+  ];
+  const cur = SECTIONS.find((s) => s.id === section);
+  const model = MODELS.find((m) => m.id === prefs.model) || MODELS[0];
+  const body = cur && (
+    <div className="flex flex-col gap-5">
+      {!compactLayout && (
+        <div>
+          <h2 className="kt-text-h2 font-semibold ink">{cur.label}</h2>
+          <p className="kt-text-body ink-2 leading-relaxed mt-1">{cur.hint}{lang === "en" ? " " : ""}{t("settingsHint")}</p>
+        </div>
+      )}
+      {cur.id === "model" ? (
+        <section>
+          <div className="kt-section-title px-1 mb-1.5">{t("secModel")}</div>
+          <div className="kt-v2-card divide-y divide-[color:var(--v2-line)]">
+            <Row title={t("model")} hint={t("modelHint")} stack>
+              <select className="kt-input font-mono kt-text-caption w-full sm:w-72" value={prefs.model} onChange={(e) => setPref("model", e.target.value)} aria-label={t("model")}>
+                {MODELS.map((m) => <option key={m.id} value={m.id}>{m.id}</option>)}
+              </select>
+            </Row>
+            <Row title={t("temperature")} hint={t("temperatureHint")} stack>
+              <div className="flex items-center gap-3 w-full sm:w-72">
+                <input type="range" className="range flex-1" min="0" max="2" step="0.1" value={prefs.temperature}
+                  onChange={(e) => setPref("temperature", Number(e.target.value))} aria-label={t("temperature")} />
+                <span className="font-mono num kt-text-body ink w-8 text-right">{prefs.temperature.toFixed(1)}</span>
+              </div>
+            </Row>
+            <Row title={t("ctx")} hint={t("ctxHint")}>
+              <span className="font-mono num kt-text-body ink">{fmt(lang).num.format(model.ctx)}</span>
+            </Row>
+          </div>
+        </section>
+      ) : (
+        <section>
+          <div className="kt-section-title px-1 mb-1.5">{t("secAppearance")}</div>
+          <div className="kt-v2-card divide-y divide-[color:var(--v2-line)]">
+            <Row title={t("theme")} hint={t("themeHint")} stack>
+              <Seg value={prefs.theme} onChange={(v) => setPref("theme", v)} label={t("theme")}
+                options={[{ id: "system", label: t("system") }, { id: "light", label: t("light") }, { id: "dark", label: t("dark") }]} />
+            </Row>
+            <Row title={t("language")} hint={t("languageHint")} stack>
+              <Seg value={prefs.lang} onChange={(v) => setPref("lang", v)} label={t("language")} options={LANGS} />
+            </Row>
+          </div>
+        </section>
+      )}
+      {compactLayout && <p className="kt-text-caption ink-2 px-1">{t("settingsHint")}</p>}
+    </div>
+  );
+
+  if (compactLayout) {
+    return (
+      <div className="h-full flex flex-col">
+        <header className="h-12 px-1 flex items-center gap-1 bg-v2-chrome border-b kt-v2-edge shrink-0">
+          {cur ? (
+            <button type="button" className="ib" onClick={() => setSection(null)} title={t("back")} aria-label={t("back")}><Icon name="arrow-left" /></button>
+          ) : (
+            <button type="button" className="ib" onClick={onOpenMenu} title={t("openMenu")} aria-label={t("openMenu")}><Icon name="menu" /></button>
+          )}
+          <h1 className="kt-text-body font-semibold ink truncate">{cur ? cur.label : t("settingsTitle")}</h1>
+        </header>
+        <div className="flex-1 min-h-0 overflow-y-auto bg-v2-canvas">
+          {cur ? <div className="p-3">{body}</div> : (
+            <ul className="mt-2">
+              {SECTIONS.map((s) => (
+                <li key={s.id}>
+                  <button type="button" onClick={() => setSection(s.id)}
+                    className="w-full min-h-14 px-4 py-2 flex items-center gap-3 border-b kt-v2-line text-left active:bg-warm-200/60 dark:active:bg-warm-800/60">
+                    <Icon name={s.icon} className="kt-text-title ink-2" />
+                    <span className="flex-1 min-w-0">
+                      <span className="block kt-text-body ink font-medium">{s.label}</span>
+                      <span className="block kt-text-caption ink-2 truncate font-mono">{s.summary}</span>
+                    </span>
+                    <Icon name="chevron-right" className="ink-2" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="h-full flex min-h-0">
+      <aside className="w-56 p-3 bg-v2-panel border-r kt-v2-edge shrink-0">
+        <div className="kt-section-title px-3 h-7 flex items-center">{t("settingsTitle")}</div>
+        <ul className="flex flex-col gap-0.5">
+          {SECTIONS.map((s) => (
+            <li key={s.id}>
+              <button type="button" onClick={() => setSection(s.id)} aria-current={section === s.id ? "page" : undefined}
+                className={`w-full h-9 px-3 rounded-lg flex items-center gap-2.5 kt-text-body transition-colors ${section === s.id ? "bg-iolite/10 text-iolite dark:text-iolite-light font-medium" : "ink-2 hover:bg-[color:var(--v2-hover)]"}`}>
+                <Icon name={s.icon} />{s.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </aside>
+      <div className="flex-1 min-w-0 overflow-y-auto bg-v2-canvas">
+        <div className="max-w-4xl mx-auto px-8 py-6">{body}</div>
+      </div>
+    </div>
+  );
+}
+
+/* ── App ── */
+function App() {
+  const [convs, setConvs] = useState(() => (params.get("view") === "empty-list" ? [] : seed()));
+  const [activeId, setActiveId] = useState("c1");
+  const [view, setView] = useState(params.get("view") === "settings" ? "settings" : "chat");
+  const [query, setQuery] = useState("");
+  const [drawer, setDrawer] = useState(params.get("drawer") === "1");
+  const [drafts, setDrafts] = useState({});
+  const [live, setLive] = useState(null); // { convId, msgId }
+  const [showNew, setShowNew] = useState(false);
+  const [prefs, setPrefs] = useState(() => ({
+    model: LS.get("kt.chat.model", MODELS[0].id),
+    temperature: Number(LS.get("kt.chat.temperature", "0.7")),
+    theme: LS.get("theme", "system"),
+    lang: params.get("lang") || LS.get("kt.chat.lang", "en"),
+  }));
+  const isCompact = useMedia("(max-width: 767px)");
+  const coarse = useMedia("(pointer: coarse)");
+  const t = useMemo(() => makeT(prefs.lang), [prefs.lang]);
+  const eng = useRef(null);
+  const scRef = useRef(null), follow = useRef(true), taRef = useRef(null), searchRef = useRef(null);
+
+  const setPref = (k, v) => {
+    setPrefs((p) => ({ ...p, [k]: v }));
+    const key = { model: "kt.chat.model", temperature: "kt.chat.temperature", theme: "theme", lang: "kt.chat.lang" }[k];
+    LS.set(key, k === "theme" && v === "system" ? null : String(v));
+  };
+
+  // Theme: system / light / dark; follow the OS while on "system".
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => document.documentElement.classList.toggle("dark", prefs.theme === "dark" || (prefs.theme === "system" && mq.matches));
+    apply(); mq.addEventListener("change", apply); return () => mq.removeEventListener("change", apply);
+  }, [prefs.theme]);
+  useEffect(() => { document.documentElement.lang = prefs.lang; }, [prefs.lang]);
+
+  const conv = convs.find((c) => c.id === activeId);
+  const draft = drafts[activeId] ?? "";
+  const setDraft = (v) => setDrafts((d) => ({ ...d, [activeId]: v }));
+  const model = MODELS.find((m) => m.id === prefs.model) || MODELS[0];
+  const ctxUsed = useMemo(() => {
+    if (!conv) return 0;
+    const chars = conv.messages.reduce((n, m) => n + (m.text ? m.text.length : m.parts.reduce((k, p) => k + (p.text || p.output || "").length, 0)), 0);
+    return Math.round(chars / 3.6) + 180;
+  }, [conv]);
+
+  /* Streaming engine: tokens land in a mutable draft; React sees at most one commit per 80ms. */
+  const startReply = useCallback((convId, msgId) => {
+    const e = { convId, msgId, parts: [], timers: [], tokens: 0, t0: performance.now(), pending: null, done: false };
+    eng.current = e;
+    const commit = () => {
+      clearTimeout(e.pending); e.pending = null;
+      const parts = e.parts.map((p) => ({ ...p }));
+      const stats = { tokens: e.tokens, elapsed: performance.now() - e.t0 };
+      setConvs((cs) => cs.map((c) => c.id !== convId ? c : { ...c, updated: Date.now(),
+        messages: c.messages.map((m) => m.id !== msgId ? m : { ...m, parts, stats }) }));
+    };
+    const schedule = () => { if (!e.pending) e.pending = setTimeout(commit, 80); };
+    const later = (fn, ms) => { e.timers.push(setTimeout(() => { if (!e.done) fn(); }, ms)); };
+    e.finish = (status) => {
+      if (e.done) return; e.done = true;
+      e.timers.forEach(clearTimeout);
+      if (status === "stopped") e.parts.forEach((p) => { if (p.status === "running") p.status = "interrupted"; });
+      commit();
+      setConvs((cs) => cs.map((c) => c.id !== convId ? c : { ...c, messages: c.messages.map((m) => m.id !== msgId ? m : { ...m, status }) }));
+      setLive(null); eng.current = null;
+    };
+    let si = 0;
+    const next = () => {
+      if (si >= SCRIPT.length) return e.finish("done");
+      const s = SCRIPT[si++];
+      if (s.type === "text") {
+        const part = { type: "text", id: uid("p"), text: "" };
+        e.parts.push(part);
+        const toks = s.text.match(/\s*\S{1,6}|\s+/g) || [];
+        let k = 0;
+        const tick = () => {
+          part.text += toks[k++]; e.tokens++; schedule();
+          if (k < toks.length) later(tick, 14 + Math.random() * 26); else later(next, 250);
+        };
+        later(tick, 120);
+      } else {
+        const part = { type: "tool", id: uid("p"), name: s.name, args: s.args, status: "running" };
+        e.parts.push(part); commit();
+        later(() => { part.status = s.ok ? "ok" : "error"; part.output = s.output; part.ms = s.ms; commit(); later(next, 300); }, s.ms);
+      }
+    };
+    setLive({ convId, msgId });
+    next();
+  }, []);
+
+  const stop = () => eng.current && eng.current.finish("stopped");
+  useEffect(() => () => eng.current && eng.current.finish("stopped"), []);
+
+  const send = (textArg) => {
+    const text = (textArg ?? draft).trim();
+    if (!text || live) return;
+    let id = activeId;
+    const userMsg = { id: uid("m"), role: "user", text };
+    const asst = { id: uid("m"), role: "assistant", parts: [], status: "streaming", model: prefs.model, stats: { tokens: 0, elapsed: 0 } };
+    setConvs((cs) => cs.map((c) => c.id !== id ? c : {
+      ...c, title: c.title || cut(text.replace(/\s+/g, " "), 48), updated: Date.now(), messages: [...c.messages, userMsg, asst],
+    }));
+    setDrafts((d) => ({ ...d, [id]: "" }));
+    follow.current = true;
+    startReply(id, asst.id);
+  };
+  const regenerate = (msgId) => {
+    if (live) return;
+    const asst = { id: uid("m"), role: "assistant", parts: [], status: "streaming", model: prefs.model, stats: { tokens: 0, elapsed: 0 } };
+    setConvs((cs) => cs.map((c) => c.id !== activeId ? c : { ...c, messages: [...c.messages.filter((m) => m.id !== msgId), asst] }));
+    follow.current = true;
+    startReply(activeId, asst.id);
+  };
+  const newChat = () => {
+    const existing = convs.find((c) => c.messages.length === 0);
+    const id = existing ? existing.id : uid("c");
+    if (!existing) setConvs((cs) => [{ id, title: "", updated: Date.now(), messages: [] }, ...cs]);
+    setActiveId(id); setView("chat"); setDrawer(false);
+    requestAnimationFrame(() => taRef.current && !coarse && taRef.current.focus());
+  };
+  const select = (id) => { setActiveId(id); setView("chat"); setDrawer(false); follow.current = true; };
+  const openSettings = () => { setView("settings"); setDrawer(false); };
+
+  // Demo hooks for screenshots: ?view=new, ?demo=stream
+  useEffect(() => {
+    if (params.get("view") === "new") newChat();
+    if (params.get("demo") === "stream") {
+      const id = "c-demo";
+      setConvs((cs) => [{ id, title: "", updated: Date.now(), messages: [] }, ...cs]);
+      setActiveId(id);
+    }
+  }, []);
+  const sendRef = useRef(send); sendRef.current = send;
+  useEffect(() => {
+    if (params.get("demo") === "stream") {
+      const timer = setTimeout(() => sendRef.current("How do I serve a GGUF model locally and stream the reply token by token?"), 60);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  // Follow the tail only within 80px of the bottom; one scroll per commit, in rAF.
+  const onScroll = () => {
+    const el = scRef.current; if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    follow.current = atBottom;
+    if (atBottom) setShowNew(false);
+  };
+  useLayoutEffect(() => {
+    const el = scRef.current; if (!el) return;
+    if (follow.current) { const id = requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; }); return () => cancelAnimationFrame(id); }
+    else if (live && live.convId === activeId) setShowNew(true);
+  }, [conv, view]);
+  useEffect(() => { follow.current = true; setShowNew(false); }, [activeId]);
+  // Content also grows after commits (fonts, icons, content-visibility); keep the tail while following.
+  const colRef = useRef(null);
+  useEffect(() => {
+    const el = scRef.current, col = colRef.current; if (!el || !col) return;
+    let raf = 0;
+    const ro = new ResizeObserver(() => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => { if (follow.current) el.scrollTop = el.scrollHeight; });
+    });
+    ro.observe(col); return () => { ro.disconnect(); cancelAnimationFrame(raf); };
+  }, [activeId, view, conv && conv.messages.length === 0]);
+
+  // Keyboard: Ctrl/⌘+K focuses conversation search (wins inside inputs); Esc closes the drawer.
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault(); if (isCompact) setDrawer(true);
+        requestAnimationFrame(() => searchRef.current && searchRef.current.focus());
+        return;
+      }
+      if (e.key === "Escape" && drawer && !e.defaultPrevented) setDrawer(false);
+    };
+    window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey);
+  }, [drawer, isCompact]);
+  useEffect(() => { if (!isCompact && drawer) setDrawer(false); }, [isCompact]);
+
+  const railProps = { convs, activeId, view, onSelect: select, onNew: newChat, onSettings: openSettings, query, setQuery,
+    liveConvId: live && live.convId, t, lang: prefs.lang, searchRef };
+  const isEmpty = conv && conv.messages.length === 0;
+  const streamingHere = !!live && live.convId === activeId;
+
+  const composer = (
+    <Composer value={draft} setValue={setDraft} onSend={() => send()} onStop={stop} streaming={streamingHere || !!live}
+      model={prefs.model} t={t} lang={prefs.lang} ctxUsed={ctxUsed} ctxMax={model.ctx} coarse={coarse} taRef={taRef} />
+  );
+
+  const emptyHero = (
+    <div className="text-center flex flex-col items-center gap-2 px-4">
+      <span className="w-12 h-12 rounded-xl bg-iolite/10 c-accent inline-flex items-center justify-center kt-text-h2" aria-hidden="true"><Icon name="chat-bot" /></span>
+      <h1 className="kt-text-h2 font-semibold ink mt-1">{t("emptyTitle", { model: prefs.model.split("-").slice(0, 2).join("-") })}</h1>
+      <p className="kt-text-body ink-2 max-w-[46ch]">{t("emptyHint")}</p>
+      <div className="mt-3 flex flex-wrap justify-center gap-2 max-w-xl" aria-label={t("startHint")}>
+        {["q1", "q2", "q3"].map((k) => (
+          <button key={k} type="button" onClick={() => { setDraft(t(k)); requestAnimationFrame(() => taRef.current && taRef.current.focus()); }}
+            className="qs-chip">
+            {t(k)}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  const chatView = conv && (
+    <div className="h-full flex flex-col min-h-0">
+      {/* Header: desktop h-11, phone h-12 with menu + new chat */}
+      <header className="h-12 md:h-11 px-1 md:px-4 flex items-center gap-1 md:gap-2 bg-v2-chrome border-b kt-v2-edge shrink-0">
+        {isCompact && <button type="button" className="ib" onClick={() => setDrawer(true)} title={t("openMenu")} aria-label={t("openMenu")}><Icon name="menu" /></button>}
+        <h1 className="kt-text-body font-semibold ink truncate flex-1 min-w-0" title={conv.title}>{conv.title || t("newChat")}</h1>
+        {!isCompact && <span className="kt-chip font-mono num" title={t("temperature")}>T {prefs.temperature.toFixed(1)}</span>}
+        {isCompact && <button type="button" className="ib" onClick={newChat} title={t("newChat")} aria-label={t("newChat")}><Icon name="add" /></button>}
+      </header>
+      {isEmpty && !isCompact ? (
+        <div className="flex-1 min-h-0 overflow-y-auto bg-v2-canvas flex flex-col justify-center px-6">
+          <div className="col max-w-[46rem] flex flex-col gap-6 -mt-10">
+            {emptyHero}
+            {composer}
+            <p className="text-center kt-text-caption ink-2">{t("kbdHint")}</p>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div ref={scRef} onScroll={onScroll} className="flex-1 min-h-0 overflow-y-auto bg-v2-canvas relative">
+            {isEmpty ? (
+              <div className="h-full flex items-center justify-center py-8">{emptyHero}</div>
+            ) : (
+              <div ref={colRef} className="col px-4 md:px-6 py-6 flex flex-col gap-6">
+                {conv.messages.map((m, i) => m.role === "user"
+                  ? <UserMessage key={m.id} m={m} t={t} />
+                  : <AssistantMessage key={m.id} m={m} t={t} lang={prefs.lang}
+                      live={live && live.msgId === m.id} canRegenerate={!live && i === conv.messages.length - 1}
+                      onRegenerate={() => regenerate(m.id)} />)}
+              </div>
+            )}
+          </div>
+          <div className="bg-v2-canvas shrink-0 relative">
+            {showNew && (
+              <button type="button" onClick={() => { follow.current = true; setShowNew(false); scRef.current.scrollTop = scRef.current.scrollHeight; }}
+                className="absolute -top-11 left-1/2 -translate-x-1/2 h-8 px-3 rounded-full bg-aquamarine/15 border border-aquamarine/40 text-aquamarine-shadow dark:text-aquamarine-light kt-text-caption inline-flex items-center gap-1 bg-v2-card">
+                <Icon name="arrow-down" />{t("newOutput")}
+              </button>
+            )}
+            <div className="col px-3 md:px-6 pt-1 pb-3 safe-bottom md:pb-3">
+              {composer}
+              {!isCompact && <p className="mt-1.5 text-center kt-text-micro ink-2">{t("kbdHint")}</p>}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="h-full flex">
+      {!isCompact && (
+        <aside className="w-60 shrink-0 border-r kt-v2-edge">
+          <Rail {...railProps} />
+        </aside>
+      )}
+      {isCompact && drawer && (
+        <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={t("openMenu")}>
+          <div className="absolute inset-0 bg-black/40" onClick={() => setDrawer(false)} />
+          <div className="absolute inset-y-0 left-0 w-72 max-w-[85vw] border-r kt-v2-edge drawer-enter">
+            <Rail {...railProps} onClose={() => setDrawer(false)} />
+          </div>
+        </div>
+      )}
+      <main className="flex-1 min-w-0 flex flex-col min-h-0 bg-v2-canvas">
+        <div className="flex-1 min-h-0">
+          {view === "settings"
+            ? <SettingsView prefs={prefs} setPref={setPref} t={t} lang={prefs.lang} compactLayout={isCompact} onOpenMenu={() => setDrawer(true)} />
+            : chatView}
+        </div>
+        {!isCompact && (
+          <footer className="h-6 px-3 flex items-center gap-2 kt-text-micro font-mono bg-v2-chrome border-t kt-v2-edge ink-2 shrink-0">
+            <span className="kt-dot kt-dot--live" role="img" aria-label={t("connected")} />
+            <span>{t("connected")}</span>
+            <span className="w-px h-3 bg-current opacity-15" />
+            <span>llama.cpp · 127.0.0.1:8080</span>
+            <span className="w-px h-3 bg-current opacity-15" />
+            <span className="truncate" title={prefs.model}>{prefs.model}</span>
+            <span className="flex-1" />
+            <span className="num">ctx {fmt(prefs.lang).num.format(ctxUsed)} / {fmt(prefs.lang).num.format(model.ctx)}</span>
+          </footer>
+        )}
+      </main>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

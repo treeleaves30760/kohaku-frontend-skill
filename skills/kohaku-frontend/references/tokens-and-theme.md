@@ -124,7 +124,7 @@ Separators inside dense bars: `width:1px; height:12–14px; background: currentC
 
   Touch (`pointer: coarse`) bumps every tier (body → 1rem). Chrome (rail, tabs, headers, settings) must use the tiers, never `text-[13px]`. Dense data views may use the de-facto micro scale (10px section labels, 11px chips/hints, 12–13px rows) — but keep it consistent and never below 10px.
 - User-adjustable **reading size** (14/16/18px root) and **zoom** (CSS `zoom` on `<html>`, not `#app`, so teleported overlays scale too) are separate preferences.
-- Section label idiom: `text-[10px] uppercase tracking-wider font-medium text-warm-500`.
+- Section label idiom: `text-[10px] uppercase tracking-wider font-medium text-warm-500`. In CJK locales (no letter case), use `text-[11px] font-semibold tracking-normal` instead. `base.css` does this through `:lang(zh|ja|ko)`, so set `<html lang>` correctly when the locale changes.
 - Headline numbers: 20–28px semibold **mono tabular**, unit in muted smaller text beside it.
 - Docs page titles: weight 700, `letter-spacing: -0.02em`, line-height ~1.08, `text-wrap: balance`. Kicker above the H1: uppercase, `.16em` tracking, .8rem/600, accent colour.
 - Chat/markdown headings are small (h1 1.3em, h2 1.15em, h3 1.05em, weight 600) — content headings must not shout.
@@ -150,4 +150,4 @@ Separators inside dense bars: `width:1px; height:12–14px; background: currentC
 - **Embeddable components** (a chat transcript reused in a VS Code webview, a graph library): leaves read only from component-scoped vars with a fallback chain, e.g. `var(--kt-conversation-accent, var(--kt-color-iolite, #5a4fcf))`. One host class maps the design system onto them; a shell variant overrides a few vars under its root. Fix colour bugs at that host boundary, never inside the leaf. Fallback hexes must equal the theme values exactly.
 - **Libraries**: put every colour in one tokens file (`--kg-*`), "no colour is written outside this file", light by default, dark under `html.dark` or a `.lib-dark` class.
 - **Per-domain gem**: bind a generic `gem` colour to CSS vars (`gem: { light: var(--gem-light), DEFAULT: var(--gem-main), shadow: var(--gem-shadow) }`) and set the vars once per page/section. A page declares its domain once; never hard-code a gem name in a page.
-- **Code syntax colours** from the gems: keyword taaffeite, string sage, function/title iolite, number coral, variable amber, comment muted italic — `-shadow` shades in light mode, `-light` in dark.
+- **Code syntax colours** from the gems, via the `--kt-syntax-*` vars in `tokens.css`: keyword taaffeite, string sage, function/title iolite, number coral, variable amber, type sapphire, comment muted italic. On light backgrounds use the `-shadow` shades. On dark backgrounds use **lifted** gems (`color-mix(gem 70%, white)`), not the `-light` pastels. The same "lifted" rule makes any gem legible as a small glyph or line on warm-950 (iolite lifted ≈ `#8b83db`, the author's own value).

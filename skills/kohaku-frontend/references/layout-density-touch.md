@@ -83,7 +83,8 @@ Every element that can receive user data must survive long, unbroken, or wide co
 - If preferences also sync to a backend: debounce/coalesce (flush after ~1.5s idle, max wait 10s, back off on failure). One keystroke must never become one request. Ephemeral state (drafts, scroll) stays local only.
 - Persist user-tuned layout: rail width/collapsed, pane sizes, chart card sizes, sort orders, per-tab scroll positions, composer drafts.
 - When redefining a preference scale, map legacy stored values so nobody's UI changes under them.
-- URL query params may override saved prefs for one load (`?view=&theme=`) without persisting.
+- URL query params may override saved prefs for one load (`?view=&theme=`) without persisting. Give every important non-initial state a URL hook (`?view=settings`, `?drawer=1`, `?demo=stream`) so it can be screenshotted (`shots.mjs --states`) and linked.
+- Theme preference key: `<app>.theme` (or plain `theme`), with values `system | light | dark`, default `system`. Pass `--theme-key <app>.theme` to `shots.mjs` when you use a prefixed key.
 - Apply theme and zoom before mount so the first paint matches.
 
 ## Keyboard model
