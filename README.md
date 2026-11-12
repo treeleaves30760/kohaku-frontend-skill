@@ -1,6 +1,6 @@
 # kohaku-frontend-skill
 
-把 [KohakuBlueleaf](https://github.com/KohakuBlueleaf) / [Kohaku-Lab](https://github.com/Kohaku-Lab) 各專案的前端設計邏輯整理成一個 Agent Skill，讓之後的專案（不論是不是 Kohaku 系列）都能直接套用同一套 UI/UX 水準。內容經作者本人同意整理。
+把 [KohakuBlueleaf](https://github.com/KohakuBlueleaf) / [Kohaku-Lab](https://github.com/Kohaku-Lab) 各專案的前端設計邏輯整理成一個 Agent Skill，讓之後的專案都能直接套用同一套 UI/UX 水準。
 
 *English: an Agent Skill that packages the frontend design language of KohakuBlueleaf's projects (KohakuTerrarium, Togeari, KohakuNodeIR, TerrariumMarket, Kohaku-Docs, KohakuTUI, …) — gemstone accents on warm stone, role-based colour, quiet chrome, no idle motion, designed phone layouts, plain copy — distilled from source, tests and commit history with the author's consent.*
 
