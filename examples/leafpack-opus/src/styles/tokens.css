@@ -1,0 +1,235 @@
+/*
+ * Kohaku design tokens — framework-agnostic CSS variables.
+ *
+ * Source of truth for the "gemstone on warm stone" language used across
+ * KohakuTerrarium, Togeari, KohakuNodeIR, TerrariumMarket, Kohaku-Docs.
+ * Values are the KohakuTerrarium / Togeari canonical set (Nov 2026).
+ *
+ * Rules baked in here:
+ *  - Seven gems, each with exactly three shades: light / DEFAULT / shadow.
+ *    No 100-900 scale for gems; no "-dark"/"-deep" shades. Warm is the only
+ *    neutral and the only full ramp.
+ *  - Light mode = "stone frame": the frame (rail, strip) is darker than a
+ *    near-white canvas. Dark mode lifts each surface level lighter and drops
+ *    card shadows.
+ *  - Never cool slate/zinc greys. Never stock Tailwind hues.
+ *
+ * Usage: import once at the app root, toggle dark mode with `html.dark`.
+ */
+
+:root {
+  /* ── Gems (light / DEFAULT / shadow) ─────────────────────────── */
+  --kt-color-sapphire-light: #d6e3f8;
+  --kt-color-sapphire: #0f52ba;
+  --kt-color-sapphire-shadow: #082567;
+  --kt-color-aquamarine-light: #d4ede8;
+  --kt-color-aquamarine: #4c9989;
+  --kt-color-aquamarine-shadow: #1b6b5a;
+  --kt-color-taaffeite-light: #e8d5ed;
+  --kt-color-taaffeite: #a57eae;
+  --kt-color-taaffeite-shadow: #6b4670;
+  --kt-color-iolite-light: #ddd0f0;
+  --kt-color-iolite: #5a4fcf;
+  --kt-color-iolite-shadow: #312a7a;
+  --kt-color-amber-light: #f5e6c8;
+  --kt-color-amber: #d4920a;
+  --kt-color-amber-shadow: #8b5e00;
+  --kt-color-coral-light: #f5d5d5;
+  --kt-color-coral: #d46b6b;
+  --kt-color-coral-shadow: #8b3a3a;
+  --kt-color-sage-light: #d5e8da;
+  --kt-color-sage: #5a9e6f;
+  --kt-color-sage-shadow: #3a6b48;
+
+  /* ── Warm neutral ramp (the only grey) ───────────────────────── */
+  --kt-color-warm-50: #f7f5f2;
+  --kt-color-warm-100: #efece7;
+  --kt-color-warm-200: #e0dbd4;
+  --kt-color-warm-300: #c5bfb7;
+  --kt-color-warm-400: #a09a92;
+  --kt-color-warm-500: #8a8480;
+  --kt-color-warm-600: #6a645f;
+  --kt-color-warm-700: #4a4540;
+  --kt-color-warm-800: #3a3632;
+  --kt-color-warm-900: #2a2724;
+  --kt-color-warm-950: #1a1816;
+
+  /* ── Semantic roles (pick by meaning, never by look) ─────────── */
+  --kt-accent: var(--kt-color-iolite);          /* primary, focus, selection, links */
+  --kt-accent-text: var(--kt-color-iolite);
+  --kt-live: var(--kt-color-aquamarine);        /* running, connected, alive */
+  --kt-ok: var(--kt-color-sage);                /* done, success, passed */
+  --kt-attention: var(--kt-color-amber);        /* waiting on you, warning, edit mode */
+  --kt-danger: var(--kt-color-coral);           /* error, destructive */
+  --kt-info: var(--kt-color-sapphire);          /* tool, informational, magnitude/heat */
+  --kt-entity: var(--kt-color-taaffeite);       /* secondary entity: sub-agent, category */
+  --kt-neutral: var(--kt-color-warm-400);       /* stopped, idle-unknown, metadata */
+
+  /* Solid fills for bars/meters/sparklines. Dark mode lifts the deep gems
+     (sapphire, iolite) so they don't sink into warm-950. */
+  --kt-fill-accent: var(--kt-color-iolite);
+  --kt-fill-info: var(--kt-color-sapphire);
+
+  /* Text on a tinted/light background uses the -shadow shade (light mode).
+     Muted = metadata, labels, captions. Faint = placeholders, disabled,
+     decorative separators only (it fails body-text contrast). */
+  --kt-ok-text: var(--kt-color-sage-shadow);
+  --kt-live-text: var(--kt-color-aquamarine-shadow);
+  --kt-attention-text: var(--kt-color-amber-shadow);
+  --kt-danger-text: var(--kt-color-coral);      /* coral DEFAULT is legible as text */
+
+  /* ── Base surfaces: "stone" light ────────────────────────────── */
+  --color-bg: #f2eee8;
+  --color-surface: #ffffff;
+  --color-surface-alt: #efebe5;
+  --color-border: #e5dfd7;
+  --color-text: #2e2a26;
+  --color-text-muted: #6c655d;
+  --color-text-faint: #8f8880;
+
+  /* ── v2 five-level surfaces (app shells) ─────────────────────── */
+  --v2-rail: #dcd5cb;        /* darkest frame: nav rail */
+  --v2-chrome: #e3ddd5;      /* tab strip / app header */
+  --v2-canvas: #fbfaf8;      /* what a tab shows; the active tab uses this */
+  --v2-panel: #f2eee8;       /* side regions, always edged by --v2-line-strong */
+  --v2-card: #ffffff;        /* grouped content on a canvas */
+  --v2-card-shadow: 0 1px 2px rgb(40 34 28 / 0.05);
+  --v2-float: #ffffff;       /* menus, popovers, docks — above the page */
+  --v2-float-shadow: 0 6px 20px rgb(30 24 18 / 0.14);
+  --v2-line: #e5dfd7;        /* rows inside a region */
+  --v2-line-strong: #cdc5ba; /* region boundaries */
+  --v2-hover: rgb(36 33 29 / 0.07);
+  --v2-ink: #24211d;         /* reading text: near-black */
+  --v2-ink-2: #6c655d;
+  --v2-ink-3: #8f8880;
+
+  /* ── Typography ──────────────────────────────────────────────── */
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "PingFang TC",
+    "Microsoft JhengHei", sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, "Cascadia Code", Consolas, monospace;
+
+  /* Semantic size tiers — name by what the text DOES. App-shell density. */
+  --kt-fs-micro: 0.65rem;    /* badge counters, superscripts */
+  --kt-fs-caption: 0.75rem;  /* section labels, tab labels, hints */
+  --kt-fs-body: 0.875rem;    /* default body, rail items, header titles */
+  --kt-fs-emphasis: 1rem;    /* prominent body */
+  --kt-fs-title: 1.125rem;   /* card title */
+  --kt-fs-h2: 1.25rem;
+  --kt-fs-h1: 1.5rem;
+
+  /* ── Shape & motion ──────────────────────────────────────────── */
+  --kt-radius-control: 0.5rem;  /* buttons, inputs (rounded-lg) */
+  --kt-radius-card: 0.75rem;    /* cards, panels, dialogs (rounded-xl) */
+  --kt-radius-pill: 9999px;     /* chips, badges */
+  --kt-ease: ease;
+  --kt-dur-fast: 0.15s;         /* colour / opacity / chevron */
+  --kt-dur: 0.2s;               /* fade / slide transitions */
+
+  /* ── Syntax colours (code blocks, editors) ───────────────────────
+     Light background: the -shadow shades. Dark background (dark mode, or a
+     code block that stays dark in both themes — add .kt-code-dark): "lifted"
+     gems = color-mix(gem 70%, white). Do NOT use the -light shades on dark
+     code: they are near-white pastels and keywords become indistinguishable. */
+  --kt-syntax-keyword: var(--kt-color-taaffeite-shadow);
+  --kt-syntax-string: var(--kt-color-sage-shadow);
+  --kt-syntax-function: var(--kt-color-iolite);
+  --kt-syntax-number: var(--kt-color-coral-shadow);
+  --kt-syntax-variable: var(--kt-color-amber-shadow);
+  --kt-syntax-type: var(--kt-color-sapphire);
+  --kt-syntax-comment: var(--color-text-muted);
+
+  /* ── Data viz (tuned per mode; validated for colour-vision deficiency) ── */
+  --kt-chart-cat-1: #5a4fcf;
+  --kt-chart-cat-2: #1f9a80;
+  --kt-chart-good: #3a8a55;
+  --kt-chart-warn: #b87a00;
+  --kt-chart-bad: #c24a4a;
+  --kt-chart-idle: #a09a92;
+  --kt-chart-axis: #77706a;
+  --kt-chart-grid: rgb(36 33 29 / 0.07);
+}
+
+/* Reading surfaces (docs, articles): retune the tiers around a 16px body. */
+.kt-reading,
+html[data-kt-density="reading"] {
+  --kt-fs-micro: 0.75rem;
+  --kt-fs-caption: 0.875rem;
+  --kt-fs-body: 1rem;
+  --kt-fs-emphasis: 1.125rem;
+  --kt-fs-title: 1.375rem;
+  --kt-fs-h2: 1.75rem;
+  --kt-fs-h1: 2.5rem;
+  --kt-measure: min(78ch, 100%);
+}
+
+/* Touch: bump every tier so chrome is readable without per-component overrides. */
+@media (pointer: coarse) {
+  :root {
+    --kt-fs-micro: 0.75rem;
+    --kt-fs-caption: 0.85rem;
+    --kt-fs-body: 1rem;
+    --kt-fs-emphasis: 1.05rem;
+    --kt-fs-title: 1.2rem;
+    --kt-fs-h2: 1.35rem;
+    --kt-fs-h1: 1.6rem;
+  }
+}
+
+html.dark,
+.kt-code-dark {
+  --kt-syntax-keyword: color-mix(in srgb, var(--kt-color-taaffeite) 70%, white);
+  --kt-syntax-string: color-mix(in srgb, var(--kt-color-sage) 70%, white);
+  --kt-syntax-function: color-mix(in srgb, var(--kt-color-iolite) 70%, white);
+  --kt-syntax-number: color-mix(in srgb, var(--kt-color-coral) 70%, white);
+  --kt-syntax-variable: color-mix(in srgb, var(--kt-color-amber) 70%, white);
+  --kt-syntax-type: color-mix(in srgb, var(--kt-color-sapphire) 70%, white);
+  --kt-syntax-comment: #8a8078;
+}
+/* A code block that stays dark in both themes. */
+.kt-code-dark {
+  background: var(--kt-color-warm-950);
+  color: #e8e0d8;
+}
+
+html.dark {
+  /* In dark mode accents and text-on-tint switch to the -light shade. */
+  --kt-accent-text: var(--kt-color-iolite-light);
+  --kt-ok-text: var(--kt-color-sage-light);
+  --kt-live-text: var(--kt-color-aquamarine-light);
+  --kt-attention-text: var(--kt-color-amber-light);
+  --kt-danger-text: var(--kt-color-coral-light);
+  --kt-fill-accent: #8b83db;
+  --kt-fill-info: #6f9be0;
+
+  --color-bg: #1a1816;
+  --color-surface: #252220;
+  --color-surface-alt: #1e1c1a;
+  --color-border: #3d3835;
+  --color-text: #e8e0d8;
+  --color-text-muted: #8a8078;
+  --color-text-faint: #5a5550;
+
+  --v2-rail: #161412;
+  --v2-chrome: #1a1816;
+  --v2-canvas: #221f1d;
+  --v2-panel: #2a2724;
+  --v2-card: #2a2724;
+  --v2-card-shadow: none;
+  --v2-float: #2e2b28;
+  --v2-float-shadow: 0 6px 20px rgb(0 0 0 / 0.35);
+  --v2-line: #3a3632;
+  --v2-line-strong: #4a4540;
+  --v2-hover: rgb(255 255 255 / 0.05);
+  --v2-ink: #f3efe9;
+  --v2-ink-2: #a39a91;
+  --v2-ink-3: #6f6760;
+
+  --kt-chart-cat-1: #8076e6;
+  --kt-chart-cat-2: #25a88e;
+  --kt-chart-good: #6db585;
+  --kt-chart-warn: #d9a23a;
+  --kt-chart-bad: #e07a7a;
+  --kt-chart-idle: #6a645f;
+  --kt-chart-axis: #8a8078;
+  --kt-chart-grid: rgb(255 255 255 / 0.06);
+}

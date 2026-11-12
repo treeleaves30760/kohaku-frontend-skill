@@ -18,9 +18,8 @@ checked-out tree on 2026-11-12.
 | Kohaku-NAI | `Kohaku-NAI/client.css` | – | 2026-08 | A 41-line Gradio layout patch. No design content |
 
 **Every Oct–Nov commit body ends `Co-Authored-By: Claude Opus 5.5`.** The code is agent-written
-under his direction. What stays the same across projects is his spec: the palette, the surfaces,
-the comment voice, the AGENTS.md rules. Ad-hoc styling choices are less reliable as evidence of
-his taste. The TPU `AGENTS.md` makes this explicit: "The design language is not yours to change".
+under Kohaku's direction. What stays the same across projects is the spec: the palette, the surfaces,
+the comment voice, the AGENTS.md rules. Ad-hoc styling choices vary more from project to project. The TPU `AGENTS.md` makes this explicit: "The design language is not yours to change".
 
 ---
 
@@ -626,7 +625,7 @@ Doc shortcuts (`uno.config.js:114-130`):
 
 ---
 
-## 6. Glance projects: why they are *not* evidence of his design language
+## 6. Glance projects: not part of the Kohaku design language
 - **KohakuGBC `scripts/demo/compare.html`** (2026-11-08): IBM Plex Sans/Mono/Condensed, cool greys (`--bg #f4f5f7`, ink
   `#1a1e24`), accent `#2a55b8`, `prefers-color-scheme` with a `data-theme` override, 16px safe-area gutters, and
   `<meta name="claude:viewport-fit-sides">`. This is a Claude-artifact-style generated report, not his system.
@@ -634,8 +633,8 @@ Doc shortcuts (`uno.config.js:114-130`):
 - **KohakuHPO `webpage`** (2026-07): a dark slate/cyan Tailwind-default palette (`#0f172a`, `#22d3ee`,
   `#a855f7`), system fonts, `--maxw 880px`, a TOC shown at ≥1120px, KaTeX. A research explainer page with no gems.
 - **Kohaku-NAI `client.css`**: 41 lines of Gradio flex fixes, plus `footer {display:none}`.
-- Conclusion: **the gem system applies to his Vue product UIs.** One-off research pages and generated reports
-  use other styles, and they should not be used to infer his taste.
+- Conclusion: **the gem system applies to Kohaku's Vue product UIs.** One-off research pages and generated reports
+  use other styles.
 
 ---
 
@@ -684,7 +683,7 @@ Doc shortcuts (`uno.config.js:114-130`):
 | charts | – | none | SVG figures | uPlot + validated categorical palette |
 | line-height | – | 1.6 | 1.65 | 1.5 |
 
-### 7.3 Signs of evolution in his taste (Jul → Nov 2026)
+### 7.3 How the design language changed (Jul → Nov 2026)
 1. **Element Plus is being dropped.** In July it was confined to dialogs. By October it is gone, and every
    control is a Uno shortcut or a small `.kt-*` CSS class. Expect new work to have no EP dependency.
 2. **The colour system moved from Tailwind class names to CSS variables.** `--kt-color-*` preflights (Togeari, kir-editor),
@@ -711,8 +710,8 @@ Doc shortcuts (`uno.config.js:114-130`):
    replaces implicit Tailwind breakpoints alone. Touch tiers (`pointer: coarse`) and `touch-action: manipulation`
    show up in the docs.
 10. **Specs for agents.** `AGENTS.md` and the long comments are written as *contracts*: what must never be
-    done, why (usually a past bug), and the scripts that check it. The design language is now held stable by
-    rules and audits, not by taste alone.
+    done, why (usually a past bug), and the scripts that check it. The design language is held stable by
+    rules and audits.
 
 ### 7.4 Implications for the skill (recommended defaults, newest-first)
 - Use the palette verbatim. Emit the Uno theme colours as `--kt-color-*` vars and write hand CSS with `color-mix`.

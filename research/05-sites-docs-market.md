@@ -5,14 +5,14 @@ Scope: `kohaku-lab-home` (2025-10 → 2026-03), `kohaku-lab-homepage` (2025-04),
 `weekly` (2023), `PixelGen/frontend` (2022–2024), `ProjectTemplate-Vue` (2022), `KohakuBlueleaf` profile README.
 All paths are relative to `<clones>/`. Line numbers are from the files as of 2026-11-12.
 
-The short version: there are two visual families in his public work.
+There are two visual families in Kohaku's public work.
 
 1. **Gem/warm family** (2026, current): `Kohaku-Docs`, `TerrariumMarket`, the KT docs site, and through
    them the KT app. It uses warm stone neutrals with gem accents and iolite as the primary. It is quiet,
    bordered, and has almost no shadows.
 2. **Slate/gradient family** (`kohaku-lab-home`, 2025-10): dark-only Tailwind slate, sky→pink gradient
    text, blurred glow blobs and the standard "SaaS landing" sections. It is the lab's marketing site. It
-   predates the gem system and was never migrated. Treat it as the **legacy marketing look**, not the
+   predates the gem system and was never migrated. Treat it as the **legacy marketing look**; it is not the
    target.
 
 Before that came template-adopt phases (AstroWind in 2025, Bootstrap + Element Plus in 2022). They show

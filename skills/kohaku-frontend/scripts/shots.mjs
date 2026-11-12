@@ -3,8 +3,16 @@
 // emulation on the phone run (so `pointer: coarse` rules apply), and report
 // anything animating on an idle page.
 //
-//   npx -y -p playwright node shots.mjs <url> [outDir] [--wait 800] [--states '?view=settings,?drawer=1'] [--theme-key app.theme]
+//   npx -y -p playwright node shots.mjs <url> [outDir] [--wait 800] [--full]
+//       [--states '?view=settings,?drawer=1'] [--theme-key app.theme]
 //   (first run may need: npx playwright install chromium)
+//
+// --states takes a comma-separated list. Each entry is one of:
+//   ?a=1        query params (added inside the hash when the base URL is a
+//               hash route such as http://host/#/)
+//   #/docs?x=1  a hash route, for hash-mode routers
+//   /browse?x=1 a path, for history-mode routers
+// --full also saves a full-page PNG (<size>-<theme>-full.png) for long pages.
 //
 // Theme is forced by setting localStorage "theme" and the html.dark class
 // before load, and by emulating prefers-color-scheme, so pages that follow the
@@ -46,7 +54,8 @@ const opt = (name, fallback) => {
   const i = args.indexOf(name)
   return i >= 0 ? args[i + 1] : fallback
 }
-const positional = args.filter((a, i) => !a.startsWith("--") && !(i > 0 && args[i - 1].startsWith("--")))
+const FLAGS = new Set(["--full"]) // options that take no value
+const positional = args.filter((a, i) => !a.startsWith("--") && !(i > 0 && args[i - 1].startsWith("--") && !FLAGS.has(args[i - 1])))
 const url = positional[0]
 if (!url) {
   console.error("usage: node shots.mjs <url> [outDir] [--wait ms] [--states '?view=settings,#/new'] [--theme-key myapp.theme]")
@@ -54,6 +63,7 @@ if (!url) {
 }
 const outDir = positional[1] || "shots"
 const wait = Number(opt("--wait", 800))
+const fullPage = args.includes("--full")
 const themeKeys = ["theme", opt("--theme-key", null)].filter(Boolean)
 // Extra states reached by URL (query or hash). Give the app URL hooks for
 // non-initial states (?view=settings, ?drawer=1, ?demo=stream) — the KIR
@@ -68,8 +78,18 @@ const sizes = [
 const withState = (base, st) => {
   if (!st) return base
   if (st.startsWith("#")) return base.replace(/#.*$/, "") + st
+  if (st.startsWith("/")) return new URL(st, base).toString()
   const u = new URL(base)
-  for (const [k, v] of new URLSearchParams(st.replace(/^\?/, ""))) u.searchParams.set(k, v)
+  const params = new URLSearchParams(st.replace(/^\?/, ""))
+  if (u.hash.startsWith("#/")) {
+    // Hash router: it only reads the query that sits after the #.
+    const [route, q = ""] = u.hash.split("?")
+    const merged = new URLSearchParams(q)
+    for (const [k, v] of params) merged.set(k, v)
+    u.hash = `${route}?${merged}`
+    return u.toString()
+  }
+  for (const [k, v] of params) u.searchParams.set(k, v)
   return u.toString()
 }
 const slug = (st) => st.replace(/^[?#/]+/, "").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "default"
@@ -101,6 +121,7 @@ for (const st of states) {
       await page.waitForTimeout(wait)
       const file = join(dir, `${size.name}-${theme}.png`)
       await page.screenshot({ path: file, fullPage: false })
+      if (fullPage) await page.screenshot({ path: file.replace(/\.png$/, "-full.png"), fullPage: true })
 
       const report = await page.evaluate(() => {
         const infinite = document
@@ -114,7 +135,21 @@ for (const st of states) {
           })
           .filter((a) => a.visible)
         const sideways = document.documentElement.scrollWidth > window.innerWidth + 1
-        return { infinite, sideways }
+        // <body> scrolling instead of the window: scrollY stays 0, so router
+        // scroll restore and scroll-spy silently do nothing.
+        const b = document.body
+        const bodyScrolls = b.scrollHeight > b.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(b).overflowY)
+        const visible = (el) => el.getClientRects().length > 0
+        // Browser-default link blue means no reset is loaded.
+        const rawLinks = [...document.querySelectorAll("a[href]")].filter((a) => visible(a) && getComputedStyle(a).color === "rgb(0, 0, 238)").length
+        // A leftover default border width: one side set on purpose, the others at 3px.
+        const fatBorders = [...document.querySelectorAll("button, [role=tab], a")].filter((el) => {
+          if (!visible(el)) return false
+          const c = getComputedStyle(el)
+          const w = [c.borderTopWidth, c.borderRightWidth, c.borderBottomWidth, c.borderLeftWidth]
+          return w.filter((x) => x === "3px").length >= 2 && new Set(w).size > 1
+        }).length
+        return { infinite, sideways, bodyScrolls, rawLinks, fatBorders }
       })
       const notes = []
       // Allowed: one "working now" pulse, plus a spinner on an in-flight command.
@@ -123,6 +158,9 @@ for (const st of states) {
       if (smallLoops.length >= 3) notes.push(`${smallLoops.length} small indicators animating (pulsing dots?): ${[...new Set(smallLoops.map((a) => a.name))].slice(0, 4).join(", ")}`)
       else if (report.infinite.length > 3) notes.push(`${report.infinite.length} infinite animations: ${[...new Set(report.infinite.map((a) => a.name))].slice(0, 5).join(", ")}`)
       if (report.sideways) notes.push("page scrolls sideways")
+      if (report.bodyScrolls) notes.push("<body> is the scroll container (window.scrollY stays 0); use overflow-x: clip, not hidden, on html and body")
+      if (report.rawLinks) notes.push(`${report.rawLinks} link(s) in browser-default blue (no reset loaded?)`)
+      if (report.fatBorders) notes.push(`${report.fatBorders} control(s) with a 3px default border on some sides (reset border-width to 0)`)
       if (errors.length) notes.push(`${errors.length} console error(s): ${errors[0]}`)
       problems += notes.length
       const info = report.infinite.length && !notes.length ? `  (${report.infinite.length} loop(s): ${report.infinite.map((a) => a.name).join(", ")})` : ""

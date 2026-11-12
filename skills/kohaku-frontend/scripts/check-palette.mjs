@@ -11,7 +11,8 @@
 //   - hex colours that are not in the palette (outside an allowlisted token file)
 //   - continuously animated status indicators (animate-ping, animate-pulse on dots)
 // Warnings (exit 0 unless --strict):
-//   - text-[Npx] literals (chrome should use the kt-text-* tiers)
+//   - text-[Npx] literals that match a kt-text-* tier (12/14/16/18/20/24px).
+//     Fixed recipe sizes (10/11/13/15px, display and icon sizes) are fine.
 //   - emoji used as status/icons
 
 import { readdirSync, readFileSync, statSync } from "node:fs"
@@ -73,8 +74,8 @@ const RULES = [
   },
   {
     level: "warn",
-    re: /\btext-\[\d+(?:\.\d+)?px\]/g,
-    why: "pixel font-size literal; chrome text should use a kt-text-* tier",
+    re: /\btext-\[(?:12|14|16|18|20|24)px\]/g,
+    why: "pixel font-size that has a tier; use kt-text-caption/body/emphasis/title/h2/h1 so it scales on touch and in reading layouts",
   },
   {
     level: "warn",
@@ -98,7 +99,9 @@ const findings = []
 for (const file of walk(root)) {
   const rel = relative(root, file).replaceAll("\\", "/")
   if (allow.has(rel)) continue
-  const lines = readFileSync(file, "utf8").split(/\r?\n/)
+  // Blank out /* block comments */ (they may cite hexes) but keep line numbers.
+  const text = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, " "))
+  const lines = text.split(/\r?\n/)
   lines.forEach((line, i) => {
     for (const r of RULES) {
       for (const m of line.matchAll(r.re)) findings.push({ level: r.level, file: rel, line: i + 1, match: m[0], why: r.why })

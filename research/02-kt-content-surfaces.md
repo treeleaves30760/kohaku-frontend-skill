@@ -4,7 +4,7 @@ Source: `<clones>/KohakuTerrarium/src/kohakuterrarium-frontend` (Vue 3 + UnoCSS 
 All paths below are relative to `src/` unless they start with `uno.config.js` / repo root.
 Scope: chat, session-v2, sessions (trace/cost), subagents, panels (canvas/debug/logs), editor, graph,
 lab, studio (light), drives, admin/auth/host-picker, `public/chat` (shared chat-ui package), `ext` (HUD / SDK UI).
-Out of scope (other agent): app chrome, layout, settings shell, the base palette/shortcuts/type tiers.
+Out of scope (covered in 01): app chrome, layout, settings shell, the base palette/shortcuts/type tiers.
 
 Legend: **[STRONG]** = recurring rule seen in 3+ places or defended in commits/tests.
 **[ONE-OFF]** = local choice, don't over-generalize. **[INCONSISTENT]** = the codebase disagrees with itself.
@@ -419,8 +419,7 @@ spacer, actions slot) + body. Empty: icon at 60% opacity + one short line, `py-8
 `AgentsTable.vue`: desktop = `<table class="text-xs">`, header `text-warm-400 font-medium`, rows
 `border-b last:border-b-0 hover:bg-warm-50`, numbers right-aligned mono, "—" for missing, state chip
 (running = aquamarine/10 + aquamarine-shadow text; else warm-100 + warm-500), row actions as small outlined
-buttons in semantic color (Stop coral/30 border, Start aquamarine/40). **Phone = not a squeezed table** but
-`min-h-14` tap rows: status dot, name + badges, second line mono model + tokens, trailing chevron → sheet.
+buttons in semantic color (Stop coral/30 border, Start aquamarine/40). **Phone = `min-h-14` tap rows instead of a squeezed table:** status dot, name + badges, second line mono model + tokens, trailing chevron → sheet.
 
 ### 9.2 Context bars
 `session-v2/status/ContextBar.vue`: label row (name, privileged shield, `used / max · pct%` mono colored by
@@ -647,7 +646,7 @@ truncated", "Thinking", "Save & Rerun", "Triggered by", `chat.subagent.empty: "(
 
 ---
 
-## 17. Explicit "don'ts" (with the author's rationale)
+## 17. Explicit "don'ts" (with the rationale from the source)
 
 1. Don't animate status dots / idle elements — "any continuous animation on each one was enough to saturate
    the compositor … animation added no information." (`style.css:510-522`)

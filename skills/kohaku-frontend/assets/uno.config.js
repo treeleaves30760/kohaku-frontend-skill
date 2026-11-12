@@ -1,4 +1,4 @@
-// Kohaku UnoCSS config — the author's native stack (Vue 3 + UnoCSS, Carbon icons).
+// Kohaku UnoCSS config (Vue 3 + UnoCSS, Carbon icons).
 // The gem palette: warm surfaces, gem accents, iolite for focus; sage, amber and
 // coral are status colours only. Do not add hues, gem shades, or a size scale here.
 import {
@@ -36,6 +36,9 @@ export default defineConfig({
       include: [/\.(vue|svelte|[jt]sx?|mdx?|astro|html)($|\?)/],
     },
   },
+  // presetWind3 resolves `dark:` against a .dark class on an ancestor (its
+  // default), which is what tokens.css keys on (html.dark). UnoCSS ships no
+  // reset: base.css is the reset, so do not add @unocss/reset.
   presets: [
     presetWind3(),
     presetAttributify(),
@@ -89,13 +92,15 @@ export default defineConfig({
     "chip-warm":
       "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] leading-none border border-solid border-warm-200 dark:border-warm-700 bg-warm-100 dark:bg-warm-800 text-warm-600 dark:text-warm-300",
     "chip-iolite": "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] leading-none border border-solid border-iolite/40 bg-iolite/10 text-iolite dark:text-iolite-light",
-    "chip-aqua": chip("aquamarine"),
+    "chip-aquamarine": chip("aquamarine"),
+    "chip-aqua": chip("aquamarine"), // short alias
     "chip-sage": chip("sage"),
     "chip-amber": chip("amber"),
     "chip-coral": chip("coral"),
     "chip-sapphire": chip("sapphire"),
     "chip-taaffeite": chip("taaffeite"),
-    // Solid-tint badge formula.
+    // Solid-tint badge: shape only. Add the colour where you use it, e.g.
+    // "gem-badge bg-sage-light text-sage-shadow dark:bg-sage-shadow/30 dark:text-sage-light".
     "gem-badge": "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
 
     // ── surfaces ──

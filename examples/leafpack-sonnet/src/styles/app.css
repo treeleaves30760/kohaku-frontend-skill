@@ -1,0 +1,107 @@
+/* Leafpack app styles. Colours only through tokens (var(--kt-color-*), var(--v2-*)). */
+html, body, #app { min-height: 100%; }
+body { background: var(--v2-canvas); color: var(--color-text); }
+.muted { color: var(--color-text-muted); }
+.faint { color: var(--color-text-faint); }
+.ink { color: var(--v2-ink); }
+.accent-text { color: var(--kt-accent-text); }
+.line { border-color: var(--v2-line); }
+
+/* Phone bottom bar sits above the safe area. */
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
+a { color: inherit; text-decoration: none; }
+
+/* ── Cards ── */
+.lp-card-link {
+  transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+.lp-card-link:hover {
+  border-color: color-mix(in srgb, var(--kt-color-iolite) 45%, var(--v2-line));
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--kt-color-iolite) 10%, transparent);
+  transform: translateY(-1px);
+}
+.lp-card-link:focus-visible { border-color: var(--kt-color-iolite); }
+
+/* ── Prose (readme + docs) ── */
+.kt-prose { line-height: 1.7; overflow-wrap: anywhere; }
+.kt-prose > * + * { margin-top: 0.9em; }
+.kt-prose h1 { font-size: var(--kt-fs-h1); font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; text-wrap: balance; }
+.kt-prose h2 { font-size: var(--kt-fs-h2); font-weight: 650; letter-spacing: -0.01em; line-height: 1.25; margin-top: 1.9em; scroll-margin-top: 72px; }
+.kt-prose h3 { font-size: var(--kt-fs-title); font-weight: 600; margin-top: 1.5em; scroll-margin-top: 72px; }
+.kt-prose h2 .anchor, .kt-prose h3 .anchor { margin-left: 0.4em; opacity: 0; color: var(--kt-accent-text); font-weight: 400; transition: opacity 150ms; }
+.kt-prose h2:hover .anchor, .kt-prose h3:hover .anchor, .kt-prose .anchor:focus-visible { opacity: 0.7; }
+.kt-prose ul { padding-left: 1.3em; list-style: disc; }
+.kt-prose ol { padding-left: 1.4em; list-style: decimal; }
+.kt-prose li + li { margin-top: 0.3em; }
+.kt-prose li::marker { color: var(--color-text-faint); }
+.kt-prose a { color: var(--kt-accent-text); text-decoration: underline; text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
+.kt-prose code:not(pre code) {
+  font-size: 0.88em; padding: 0.15rem 0.4rem; border-radius: 0.375rem;
+  background: color-mix(in srgb, var(--kt-color-warm-400) 18%, transparent);
+  word-break: break-word;
+}
+.kt-prose strong { font-weight: 600; color: var(--v2-ink); }
+
+/* Code block: language label via ::before, scrolls sideways. */
+.kt-code {
+  position: relative; margin: 0; padding: 2.1rem 1rem 0.9rem; border-radius: 0.75rem;
+  border: 1px solid var(--v2-line); background: var(--color-surface-alt);
+  font-size: 0.86rem; line-height: 1.6; overflow-x: auto; max-width: 100%; white-space: pre;
+}
+.kt-code::before {
+  content: attr(data-lang); position: absolute; top: 0.55rem; left: 1rem;
+  font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-muted);
+  font-family: var(--font-sans);
+}
+.kt-code code { font-family: var(--font-mono); background: none; padding: 0; }
+.tok-k { color: var(--kt-syntax-keyword); }
+.tok-s { color: var(--kt-syntax-string); }
+.tok-n { color: var(--kt-syntax-number); }
+.tok-f { color: var(--kt-syntax-function); }
+.tok-v { color: var(--kt-syntax-variable); }
+.tok-c { color: var(--kt-syntax-comment); font-style: italic; }
+
+/* Table: block + horizontal scroll. */
+.kt-prose table { display: block; overflow-x: auto; max-width: 100%; border-collapse: collapse; font-size: 0.92em; }
+.kt-prose th, .kt-prose td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--v2-line); text-align: left; vertical-align: top; }
+.kt-prose th { background: var(--v2-hover); font-weight: 600; white-space: nowrap; }
+.kt-prose td code { white-space: nowrap; }
+
+/* Callouts: 4px gem bar, tinted fill. */
+.kt-callout {
+  --gem: var(--kt-color-sapphire); --gem-fill: var(--kt-color-sapphire-light);
+  --gem-fill-dark: var(--kt-color-sapphire-shadow); --gem-text: var(--kt-color-sapphire); --gem-text-dark: var(--kt-color-sapphire-light);
+  border: 1px solid color-mix(in srgb, var(--gem) 28%, transparent); border-left: 4px solid var(--gem);
+  border-radius: 0.75rem; padding: 0.75rem 1rem;
+  background: color-mix(in srgb, var(--gem-fill) 55%, var(--color-surface));
+}
+html.dark .kt-callout { background: color-mix(in srgb, var(--gem-fill-dark) 30%, var(--color-surface)); }
+.kt-callout__title { display: flex; align-items: center; gap: 0.4rem; font-weight: 600; font-size: var(--kt-fs-body); color: var(--gem-text); }
+html.dark .kt-callout__title { color: var(--gem-text-dark); }
+.kt-callout--tip { --gem: var(--kt-color-sage); --gem-fill: var(--kt-color-sage-light); --gem-fill-dark: var(--kt-color-sage-shadow); --gem-text: var(--kt-color-sage-shadow); --gem-text-dark: var(--kt-color-sage-light); }
+.kt-callout--warn { --gem: var(--kt-color-amber); --gem-fill: var(--kt-color-amber-light); --gem-fill-dark: var(--kt-color-amber-shadow); --gem-text: var(--kt-color-amber-shadow); --gem-text-dark: var(--kt-color-amber-light); }
+.kt-callout--danger { --gem: var(--kt-color-coral); --gem-fill: var(--kt-color-coral-light); --gem-fill-dark: var(--kt-color-coral-shadow); --gem-text: var(--kt-color-coral-shadow); --gem-text-dark: var(--kt-color-coral-light); }
+.kt-callout > p { margin-top: 0.35rem; }
+
+/* Selected / hoverable list rows */
+.lp-row { transition: background-color 150ms; }
+.lp-row:hover { background: var(--v2-hover); }
+.lp-active { background: color-mix(in srgb, var(--kt-color-iolite) 12%, transparent); color: var(--kt-accent-text); }
+
+/* Skeleton: only on a truly empty first load. Static: the motion budget has no room for six pulsing cards. */
+.lp-skel { background: var(--v2-line); border-radius: 0.5rem; opacity: 0.7; }
+
+/* Page padding for the bottom tab bar on phones. */
+@media (max-width: 767px) {
+  #app { padding-bottom: calc(3.5rem + env(safe-area-inset-bottom)); }
+}
+
+/* base.css sets html/body height:100% with overflow-x:hidden, which turns <body> into the
+   scroll container (window never scrolls: scroll events, scrollTo and scroll restoration
+   all miss). Clip instead so the document scrolls normally. */
+html, body { height: auto; min-height: 100%; overflow-x: clip; }
+
+/* Prose tables must not break words mid-letter on phones. */
+.kt-prose th, .kt-prose td { overflow-wrap: normal; word-break: normal; }
+.kt-prose td, .kt-prose th { min-width: 5.5rem; }

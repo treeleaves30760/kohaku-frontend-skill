@@ -1,6 +1,6 @@
 # Terminal / CLI / TUI surfaces
 
-The terminal uses the same design language through **semantic roles**; components ask for roles, never raw colours.
+The terminal uses the same design language through semantic roles. Components ask for roles, not raw colours.
 
 ## Roles and palette
 
@@ -22,7 +22,7 @@ The terminal uses the same design language through **semantic roles**; component
 
 ## Glyphs
 
-- Status = glyph + colour, and **the glyph replaces the word**: braille spinner (aquamarine, 80ms/frame) running · `✓` sage ok · `✗` coral error · `○` amber interrupted · `⚙` amber busy/waiting · `!` amber needs you · `◆` taaffeite sub-agent · `●` / `○` live/idle dots.
+- Status = glyph + colour, and the glyph replaces the word: braille spinner (aquamarine, 80ms/frame) running · `✓` sage ok · `✗` coral error · `○` amber interrupted · `⚙` amber busy/waiting · `!` amber needs you · `◆` taaffeite sub-agent · `●` / `○` live/idle dots.
 - No emoji in status output.
 - Frames: thin rounded `╭─╮ │ ╰─╯`, muted at rest, accent when focused. Rules `── label ───`. Tables with ` │ ` and `─┼─`, no outer box. Never heavy box drawing except `━` for the filled part of a bar.
 - Bars: `━` accent fill on a `─` muted track, eighth blocks for precision, capped at ~48 cells ("bars past ~48 cells read worse"); fixed-width percentage.

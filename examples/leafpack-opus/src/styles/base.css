@@ -1,0 +1,628 @@
+/*
+ * Kohaku base layer — import AFTER tokens.css.
+ * Reset, page defaults, touch rules, surface classes, and plain-CSS
+ * component classes for projects that do not use UnoCSS/Tailwind.
+ * Every rule here exists because we hit the bug it prevents;
+ * the comments say which.
+ */
+
+/* This file is the reset. UnoCSS ships none, so do not add @unocss/reset on
+   top: its default border colour is a cool grey outside the palette. */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  /* Width 0 + style solid on every side, so `border-b-2` draws one edge.
+     `border: none` leaves the width at `medium`, and a later `border-solid`
+     then paints a 3px box on the other three sides. */
+  border: 0 solid var(--v2-line);
+}
+:root {
+  --un-default-border-color: var(--v2-line);
+}
+hr {
+  height: 0;
+  border-top-width: 1px;
+}
+a {
+  color: inherit;
+  text-decoration: inherit;
+}
+ul,
+ol,
+menu {
+  list-style: none;
+}
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+button {
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  appearance: none;
+}
+select,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+html {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  height: 100%;
+  /* Android "font boosting" inflated a narrow chat input to ~32-40px. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* One stray nowrap row must not make the whole page pan sideways;
+     scoped scrollers opt back in with overflow-x:auto.
+     `clip`, not `hidden`: hidden on both html and body turns <body> into the
+     scroll container, so window.scrollY stays 0 and router scroll restore,
+     scroll-spy and scrollTo() all stop working on pages that scroll as a
+     document. The `hidden` line is the fallback for browsers without clip. */
+  overflow-x: hidden;
+  overflow-x: clip;
+  /* Kill iOS double-tap zoom on chrome; pinch-zoom still works. */
+  touch-action: manipulation;
+}
+/* Keeps the html/body/#app height chain for app shells. A site or docs page
+   simply overflows it and the window scrolls. */
+body {
+  height: 100%;
+  overflow-x: hidden;
+  overflow-x: clip;
+  /* Unclassed text follows the density preset: 14px in an app, 16px inside
+     .kt-reading and on touch. */
+  font-size: var(--kt-fs-body);
+}
+.kt-reading {
+  font-size: var(--kt-fs-body);
+  line-height: 1.7;
+}
+
+code,
+pre,
+kbd,
+.font-mono,
+.num {
+  font-family: var(--font-mono);
+}
+/* Every figure that can change or be compared is tabular. */
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Thin warm scrollbars. */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Keyboard focus: always visible, iolite, never on mouse click. */
+:focus-visible {
+  outline: 2px solid var(--kt-accent);
+  outline-offset: 2px;
+}
+/* Inputs show focus with their own border + ring instead. */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+}
+/* Containers focused from script (a drawer panel, <main> after a route
+   change) are not tab stops and should not show the ring. */
+[tabindex="-1"]:focus-visible {
+  outline: none;
+}
+
+/* Light-mode contrast patch for utility-class projects (UnoCSS/Tailwind with the
+   Kohaku palette): warm-400/500 are too pale as text on stone surfaces. :where()
+   keeps specificity at zero so hover/dark variants still win. Harmless elsewhere. */
+:where(html:not(.dark)) .text-warm-400 { color: #77706a; }
+:where(html:not(.dark)) .text-warm-500 { color: #655e57; }
+
+/* ── Size tiers as classes (use on chrome instead of text-[Npx]) ── */
+.kt-text-micro { font-size: var(--kt-fs-micro); }
+.kt-text-caption { font-size: var(--kt-fs-caption); }
+.kt-text-body { font-size: var(--kt-fs-body); }
+.kt-text-emphasis { font-size: var(--kt-fs-emphasis); }
+.kt-text-title { font-size: var(--kt-fs-title); }
+.kt-text-h2 { font-size: var(--kt-fs-h2); }
+.kt-text-h1 { font-size: var(--kt-fs-h1); }
+
+/* ── Touch ─────────────────────────────────────────────────────── */
+@media (pointer: coarse) {
+  /* iOS zooms the viewport on focus below 16px. max() lets a larger
+     reading size still grow the input past the floor. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  textarea,
+  select,
+  [contenteditable="true"] {
+    font-size: max(16px, 1rem) !important;
+  }
+}
+
+/* Hover-revealed actions: visible on hover OR keyboard focus, and ALWAYS
+   visible on touch (no hover there). Pair with a non-overlay layout so the
+   actions never sit on top of a neighbour's tap target.
+   Markup: put class="group" on the row/card (a plain class; nothing else to
+   define) and class="hover-only-action" on the action container. Keep actions
+   visible on the selected row too: add .is-selected to the group. */
+.hover-only-action {
+  opacity: 0;
+  transition: opacity var(--kt-dur-fast) var(--kt-ease);
+}
+.group:hover .hover-only-action,
+.group:focus-within .hover-only-action,
+.group.is-selected .hover-only-action {
+  opacity: 1;
+}
+@media (pointer: coarse) {
+  .hover-only-action {
+    opacity: 1;
+  }
+  /* The UnoCSS / Tailwind shortcuts are sized for a mouse (h-8, 28px icon
+     buttons). Lift them to the 40px touch floor here, so templates do not
+     need `!h-10 md:!h-8` on every button. */
+  .btn-primary,
+  .btn-danger,
+  .btn-secondary,
+  .btn-ghost,
+  .input-field {
+    min-height: 2.5rem;
+  }
+  .btn-icon {
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+  }
+}
+
+/* ── Motion ────────────────────────────────────────────────────── */
+/* The only continuous animation allowed: an opacity pulse on things the
+   user genuinely wants to see moving. Budget: ONE pulsing element per
+   concern on screen — the "working now" line of the focused item (not one per
+   running row), and the reconnect banner while it is shown. NEVER on repeated
+   status dots — 10-30 animated dots kept the GPU busy on an idle page and
+   added no information. */
+@keyframes kt-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+.kohaku-pulse {
+  animation: kt-pulse 1.5s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── v2 surfaces ───────────────────────────────────────────────── */
+.kt-v2-rail { background: var(--v2-rail); }
+.kt-v2-chrome { background: var(--v2-chrome); }
+.kt-v2-canvas { background: var(--v2-canvas); }
+.kt-v2-panel { background: var(--v2-panel); }
+.kt-v2-card {
+  background: var(--v2-card);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--kt-radius-card);
+  box-shadow: var(--v2-card-shadow);
+}
+.kt-v2-float {
+  background: var(--v2-float);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--kt-radius-card);
+  box-shadow: var(--v2-float-shadow);
+}
+/* Line classes draw only on the sides you name (border-r etc.), so
+   width resets to 0 at zero specificity. In Tailwind projects prefer the
+   preset's `border-v2-line` / `border-v2-edge` colour utilities and don't put
+   these classes on elements that also carry Tailwind border-colour classes. */
+:where(.kt-v2-line, .kt-v2-edge) {
+  border-width: 0;
+  border-style: solid;
+}
+.kt-v2-line { border-color: var(--v2-line); }
+.kt-v2-edge { border-color: var(--v2-line-strong); }
+
+/* Fused tab: the active tab IS the canvas colour and the strip has no
+   bottom line under it, so tab and page read as one surface. */
+.kt-tab {
+  height: 2rem;
+  padding: 0 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: var(--kt-fs-caption);
+  color: var(--v2-ink-2);
+  border-radius: 0.625rem 0.625rem 0 0;
+  transition: background-color var(--kt-dur-fast) var(--kt-ease);
+}
+.kt-tab:hover { background: var(--v2-hover); }
+.kt-tab[aria-selected="true"],
+.kt-tab.is-active {
+  background: var(--v2-canvas);
+  color: var(--v2-ink);
+}
+
+/* ── Plain-CSS components (for projects without UnoCSS/Tailwind) ── */
+.kt-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  height: 2rem;
+  padding: 0 0.75rem;
+  border-radius: var(--kt-radius-control);
+  font-size: var(--kt-fs-body);
+  font-weight: 500;
+  white-space: nowrap;
+  user-select: none;
+  transition: background-color var(--kt-dur-fast), border-color var(--kt-dur-fast),
+    color var(--kt-dur-fast);
+}
+.kt-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.kt-btn--primary { background: var(--kt-color-iolite); color: #fff; }
+.kt-btn--primary:hover:not(:disabled) { background: var(--kt-color-iolite-shadow); }
+.kt-btn--danger { background: var(--kt-color-coral); color: #fff; }
+.kt-btn--danger:hover:not(:disabled) { background: var(--kt-color-coral-shadow); }
+/* Secondary hovers by tinting its border, not by filling. */
+.kt-btn--secondary {
+  background: var(--v2-panel);
+  border: 1px solid var(--v2-line-strong);
+  color: var(--color-text);
+}
+.kt-btn--secondary:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--kt-color-iolite) 50%, transparent);
+}
+.kt-btn--ghost { color: var(--kt-color-warm-600); }
+.kt-btn--ghost:hover:not(:disabled) { background: var(--v2-hover); }
+.kt-btn--sm { height: 1.75rem; padding: 0 0.625rem; font-size: var(--kt-fs-caption); }
+.kt-btn--icon { width: 2rem; padding: 0; color: var(--kt-color-warm-600); }
+.kt-btn--icon.kt-btn--sm { width: 1.75rem; }
+.kt-btn--icon:hover:not(:disabled) { background: var(--v2-hover); color: var(--color-text); }
+html.dark .kt-btn--ghost,
+html.dark .kt-btn--icon { color: var(--kt-color-warm-400); }
+@media (pointer: coarse) {
+  .kt-btn { min-height: 2.5rem; }
+  .kt-btn--icon { min-width: 2.5rem; }
+}
+
+/* Chip: gem at 10% fill, 40% border; -shadow text (light) / -light text (dark).
+   Exception: iolite and sapphire DEFAULT are already dark enough to read as
+   text on a 10% tint, so their chips use DEFAULT text in light mode.
+   Set --gem / --gem-text / --gem-text-dark on the element or use a modifier. */
+.kt-chip {
+  --gem: var(--kt-color-warm-500);
+  --gem-text: var(--kt-color-warm-700);
+  --gem-text-dark: var(--kt-color-warm-200);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.375rem;
+  border-radius: var(--kt-radius-pill);
+  font-size: 11px;
+  line-height: 1;
+  border: 1px solid color-mix(in srgb, var(--gem) 40%, transparent);
+  background: color-mix(in srgb, var(--gem) 10%, transparent);
+  color: var(--gem-text);
+}
+html.dark .kt-chip { color: var(--gem-text-dark); }
+.kt-chip--iolite { --gem: var(--kt-color-iolite); --gem-text: var(--kt-color-iolite); --gem-text-dark: var(--kt-color-iolite-light); }
+.kt-chip--aquamarine { --gem: var(--kt-color-aquamarine); --gem-text: var(--kt-color-aquamarine-shadow); --gem-text-dark: var(--kt-color-aquamarine-light); }
+.kt-chip--sage { --gem: var(--kt-color-sage); --gem-text: var(--kt-color-sage-shadow); --gem-text-dark: var(--kt-color-sage-light); }
+.kt-chip--amber { --gem: var(--kt-color-amber); --gem-text: var(--kt-color-amber-shadow); --gem-text-dark: var(--kt-color-amber-light); }
+.kt-chip--coral { --gem: var(--kt-color-coral); --gem-text: var(--kt-color-coral-shadow); --gem-text-dark: var(--kt-color-coral-light); }
+.kt-chip--sapphire { --gem: var(--kt-color-sapphire); --gem-text: var(--kt-color-sapphire); --gem-text-dark: var(--kt-color-sapphire-light); }
+.kt-chip--taaffeite { --gem: var(--kt-color-taaffeite); --gem-text: var(--kt-color-taaffeite-shadow); --gem-text-dark: var(--kt-color-taaffeite-light); }
+
+/* Status dot: colour says the state; it never animates. Always pair with
+   a text label (visible, title, or sr-only). */
+.kt-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: var(--kt-neutral);
+  flex-shrink: 0;
+}
+.kt-dot--live { background: var(--kt-live); }
+.kt-dot--ok { background: var(--kt-ok); }
+.kt-dot--attention { background: var(--kt-attention); }
+.kt-dot--danger { background: var(--kt-danger); }
+
+/* Micro section label. Muted (not faint) so it passes contrast in both modes. */
+.kt-section-title {
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+}
+/* CJK has no case: uppercase + tracking just makes tiny text. Use a slightly
+   larger, bolder label with no tracking instead. */
+:lang(zh) .kt-section-title,
+:lang(ja) .kt-section-title,
+:lang(ko) .kt-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.kt-input {
+  width: 100%;
+  height: 2rem;
+  padding: 0 0.625rem;
+  border-radius: var(--kt-radius-control);
+  background: var(--v2-card);
+  border: 1px solid var(--v2-line-strong);
+  font-size: var(--kt-fs-body);
+  transition: border-color var(--kt-dur-fast), box-shadow var(--kt-dur-fast);
+}
+.kt-input::placeholder { color: var(--color-text-faint); }
+.kt-input:focus {
+  outline: none;
+  border-color: var(--kt-color-iolite);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--kt-color-iolite) 22%, transparent);
+}
+.kt-input[aria-invalid="true"] { border-color: var(--kt-color-coral); }
+
+/* Segmented control: the selected segment is a raised surface chip, not a fill. */
+.kt-seg {
+  display: inline-flex;
+  padding: 0.125rem;
+  gap: 0.125rem;
+  border-radius: var(--kt-radius-control);
+  background: color-mix(in srgb, var(--kt-color-warm-200) 50%, transparent);
+}
+html.dark .kt-seg { background: color-mix(in srgb, var(--kt-color-warm-800) 70%, transparent); }
+.kt-seg > button {
+  height: 1.5rem;
+  padding: 0 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 11px;
+  color: var(--v2-ink-2);
+}
+.kt-seg > button[aria-checked="true"],
+.kt-seg > button[aria-pressed="true"] {
+  background: var(--v2-card);
+  color: var(--v2-ink);
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+
+/* Inline banner (section-level error/status), role="alert"/"status". */
+.kt-banner {
+  --gem: var(--kt-color-coral);
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--kt-radius-control);
+  border: 1px solid color-mix(in srgb, var(--gem) 30%, transparent);
+  background: color-mix(in srgb, var(--gem) 10%, transparent);
+  font-size: var(--kt-fs-body);
+}
+.kt-banner--attention { --gem: var(--kt-color-amber); }
+.kt-banner--ok { --gem: var(--kt-color-sage); }
+.kt-banner--info { --gem: var(--kt-color-iolite); }
+
+/* Modal shell: scrim + float panel with header / scrolling body / footer.
+   <div class="kt-dialog-scrim"><div class="kt-dialog" role="dialog" aria-modal="true" aria-labelledby="t">
+     <header class="kt-dialog__head"><h2 id="t">…</h2><button class="kt-btn kt-btn--icon" aria-label="Close">×</button></header>
+     <div class="kt-dialog__body">…</div>
+     <footer class="kt-dialog__foot"><button class="kt-btn kt-btn--ghost">Cancel</button><button class="kt-btn kt-btn--danger">Delete</button></footer>
+   </div></div>
+   Esc closes; focus moves in and returns to the opener; the confirm label is the verb. */
+.kt-dialog-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(0 0 0 / 0.4);
+}
+html.dark .kt-dialog-scrim { background: rgb(0 0 0 / 0.6); }
+.kt-dialog {
+  width: min(32rem, 100%);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--v2-float);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--kt-radius-card);
+  box-shadow: var(--v2-float-shadow);
+}
+.kt-dialog__head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--v2-line);
+  font-size: var(--kt-fs-emphasis);
+  font-weight: 600;
+}
+.kt-dialog__head > :first-child { flex: 1; font-size: inherit; }
+.kt-dialog__body { flex: 1; overflow-y: auto; padding: 1rem; }
+.kt-dialog__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--v2-line);
+}
+
+/* Phones: every dialog becomes fullscreen with one rule, instead of a
+   :fullscreen prop sprinkled over 20 templates. */
+@media (max-width: 767px) {
+  .kt-dialog-scrim { padding: 0; }
+  .kt-dialog {
+    width: 100% !important;
+    max-width: 100vw !important;
+    min-height: 100dvh;
+    max-height: 100dvh !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+  .kt-dialog__foot {
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+  }
+  .kt-dialog__foot > .kt-btn { flex: 1; }
+  .kt-dialog__body {
+    max-height: calc(100dvh - 120px); /* keep actions above the soft keyboard */
+    overflow-y: auto;
+  }
+}
+
+/* ── Loading placeholder ───────────────────────────────────────── */
+/* Static on purpose: six pulsing cards are six idle animations. If a first
+   load needs motion, put ONE .kohaku-pulse on the grid wrapper. */
+.kt-skeleton {
+  border-radius: var(--kt-radius-control);
+  background: var(--v2-hover);
+}
+
+/* ── Reading content (docs, readme panes, articles) ────────────── */
+.kt-link,
+.kt-prose a {
+  color: var(--kt-accent-text);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+.kt-prose {
+  max-width: var(--kt-measure, 78ch);
+  color: var(--v2-ink);
+  overflow-wrap: break-word;
+}
+.kt-prose > * + * { margin-top: 1em; }
+.kt-prose h1,
+.kt-prose h2,
+.kt-prose h3 {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  scroll-margin-top: 4.5rem; /* clears a sticky header */
+}
+.kt-prose h1 { font-size: var(--kt-fs-h1); }
+.kt-prose h2 { font-size: var(--kt-fs-h2); margin-top: 2.2em; }
+.kt-prose h3 { font-size: var(--kt-fs-title); margin-top: 1.8em; }
+.kt-prose ul,
+.kt-prose ol { padding-left: 1.4em; }
+.kt-prose ul { list-style: disc; }
+.kt-prose ol { list-style: decimal; }
+.kt-prose li + li { margin-top: 0.3em; }
+.kt-prose :not(pre) > code {
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.375rem;
+  background: var(--v2-hover);
+  font-size: 0.88em;
+}
+/* Wide blocks may break out of the measure. Tables scroll on their own, and
+   cells never break mid-word on a phone. */
+.kt-prose table {
+  display: block;
+  max-width: min(100%, 1100px);
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 0.92em;
+}
+.kt-prose th,
+.kt-prose td {
+  padding: 0.45rem 0.75rem;
+  border-bottom-width: 1px;
+  text-align: left;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+.kt-prose th { background: var(--v2-hover); font-weight: 600; white-space: nowrap; }
+
+/* Code block: <div class="kt-code" data-lang="bash"><pre><code>…</code></pre></div>.
+   Follows the theme; add .kt-code-dark to keep it dark in both. Colour tokens
+   with var(--kt-syntax-*). Put the copy button inside, top right. */
+.kt-code {
+  position: relative;
+  border-width: 1px;
+  border-radius: var(--kt-radius-card);
+  background: var(--v2-panel);
+  overflow: hidden;
+}
+.kt-code[data-lang]::before {
+  content: attr(data-lang);
+  display: block;
+  padding: 0.5rem 0.9rem 0;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+.kt-code pre {
+  padding: 0.75rem 0.9rem;
+  overflow-x: auto;
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+.kt-code > button {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+}
+
+/* Callout: <aside class="kt-callout kt-callout--warning"><strong>Claim</strong><p>…</p></aside>.
+   Give it an icon and a title that states the claim. */
+.kt-callout {
+  --gem: var(--kt-color-sapphire);
+  --gem-tint: var(--kt-color-sapphire-light);
+  padding: 0.75rem 1rem;
+  border-width: 1px 1px 1px 4px;
+  border-color: color-mix(in srgb, var(--gem) 40%, transparent);
+  border-left-color: var(--gem);
+  border-radius: var(--kt-radius-card);
+  background: color-mix(in srgb, var(--gem-tint) 55%, var(--v2-card));
+}
+.kt-callout > * + * { margin-top: 0.35em; }
+.kt-callout--tip { --gem: var(--kt-color-sage); --gem-tint: var(--kt-color-sage-light); --gem-deep: var(--kt-color-sage-shadow); }
+.kt-callout--rule { --gem: var(--kt-color-iolite); --gem-tint: var(--kt-color-iolite-light); --gem-deep: var(--kt-color-iolite-shadow); }
+.kt-callout--warning { --gem: var(--kt-color-amber); --gem-tint: var(--kt-color-amber-light); --gem-deep: var(--kt-color-amber-shadow); }
+.kt-callout--danger { --gem: var(--kt-color-coral); --gem-tint: var(--kt-color-coral-light); --gem-deep: var(--kt-color-coral-shadow); }
+html.dark .kt-callout {
+  background: color-mix(in srgb, var(--gem-deep, var(--kt-color-sapphire-shadow)) 30%, var(--v2-card));
+}

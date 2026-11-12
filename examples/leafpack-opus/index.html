@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Leafpack · plugins for your agents</title>
+    <meta name="description" content="Leafpack is the plugin marketplace for the Terrarium agent framework." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      // Apply the theme before first paint so there is no light flash in dark mode.
+      // Stored value is system | light | dark; ?theme= overrides it for one load.
+      ;(function () {
+        var pref = "system"
+        try {
+          pref = localStorage.getItem("leafpack.theme") || "system"
+        } catch (e) {}
+        var m = /[?&]theme=(light|dark|system)/.exec(location.href)
+        if (m) pref = m[1]
+        var dark = pref === "dark" || (pref === "system" && matchMedia("(prefers-color-scheme: dark)").matches)
+        document.documentElement.classList.toggle("dark", dark)
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

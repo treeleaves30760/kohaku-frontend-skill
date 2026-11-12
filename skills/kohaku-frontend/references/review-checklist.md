@@ -1,12 +1,12 @@
 # Review checklist and anti-patterns
 
-Run before calling a UI done. Each line is a defect the author shipped, found, and wrote a rule (or test) against.
+Run before calling a UI done. Each line comes from a defect we shipped, found, and then wrote a rule or test against.
 
 ## Automated
 
 - [ ] `node <skill>/scripts/check-palette.mjs <src>` → 0 errors (allowlist only files that cannot use tokens, e.g. favicon SVG data URLs, terminal emulator themes, each with a reason).
 - [ ] Lint/format clean; no framework warnings in the console (Vue warnings, unmatched-utility warnings).
-- [ ] Screenshots in **light and dark**, at desktop (~1440) and phone (~390) width, of every view touched: `npx -y -p playwright node <skill>/scripts/shots.mjs <url> shots/` (the phone run emulates touch, so `pointer: coarse` rules apply; it also flags infinite animations, sideways scroll and console errors). Without Playwright: browser DevTools device mode with touch emulation; an iframe only checks width, not touch. Open every PNG and look.
+- [ ] Screenshots in light and dark, at desktop (~1440) and phone (~390) width, of every view touched: `npx -y -p playwright node <skill>/scripts/shots.mjs <url> shots/` (the phone run emulates touch, so `pointer: coarse` rules apply; it also flags infinite animations, sideways scroll and console errors). Without Playwright: browser DevTools device mode with touch emulation; an iframe only checks width, not touch. Open every PNG and look.
 
 ## Colour and theme
 
@@ -41,12 +41,13 @@ Run before calling a UI done. Each line is a defect the author shipped, found, a
 - [ ] Destructive confirms: question + consequence, verb button in coral; reversible actions don't confirm.
 - [ ] Sentence case, `…` for in-progress, `—` for missing, `·` separators, no exclamation marks, no "Something went wrong".
 - [ ] Truncated strings have `title`; long unbroken strings, wide tables and images cannot push the layout sideways.
-- [ ] Check with every side pane and drawer **open** at desktop width. Primary names stay readable, and low-priority columns drop first (container queries).
+- [ ] Check with every side pane and drawer open at desktop width. Primary names stay readable, and low-priority columns drop first (container queries).
 
 ## Touch, phone, keyboard, a11y
 
 - [ ] Phone layout is a different design (drawer, tap rows, sheets, list → page), not a shrunk desktop; no horizontal page scroll at 390px.
 - [ ] Inputs ≥ 16px on touch; tap targets ≥ 40px; no `user-scalable=no`.
+- [ ] Tab from the top of each view: every stop shows the iolite ring, the order follows reading order, containers focused from script show no ring, and Esc closes the innermost layer.
 - [ ] Hover-only actions are visible on touch and reachable by keyboard (focus-within), and don't overlap neighbours.
 - [ ] Dialogs fullscreen on phones; bottom bars respect safe-area insets.
 - [ ] Visible `:focus-visible` ring (iolite) on every interactive element, including custom buttons and `role="button"` divs.
@@ -66,13 +67,13 @@ Run before calling a UI done. Each line is a defect the author shipped, found, a
 | Thought | Reality in this design language |
 |---|---|
 | "A pulsing dot makes 'running' feel alive" | Removed on purpose: 10–30 animated dots kept the GPU busy and added no information. Colour + label say running. |
-| "Tailwind blue / slate is a safe professional default" | It is exactly what the author migrated *away* from in 2026. Use iolite on warm stone. |
+| "Tailwind blue / slate is a safe professional default" | It is what we migrated away from in 2026. Use iolite on warm stone. |
 | "Each status gets its own nice colour" | Status hues are a reserved vocabulary (sage/aquamarine/amber/coral); identity uses iolite/aquamarine, then small multiples. |
 | "Skeletons everywhere look modern" | Text "Loading…" by default; keep the previous data on refresh; skeletons only for a truly empty first load. |
 | "Hover to reveal actions keeps it clean" | Only with `hover-only-action`: always visible on touch, reachable by focus. |
 | "Shrink the desktop layout for mobile" | Phones get their own interaction model. |
 | "A toast is enough for errors" | Errors that need action live next to the failure. Toasts are for results. |
-| "I'll add dark mode later" | Light and dark are designed and screenshotted together, always. |
+| "I'll add dark mode later" | Light and dark are designed and screenshotted together. |
 | "Emoji are friendlier icons" | Carbon icons and the glyph set ✓ ✗ ○ ⚙ !; one personality token per product, max. |
 | "Confirm everything to be safe" | Confirm only destructive/irreversible actions; label the button with the verb. |
 | "Theme the component library per component" | Remap its CSS variables once, globally, both modes. |

@@ -23,7 +23,7 @@ Pick by product type; all share the same tokens.
 | **Public site / market** | compact `h-11` header (mascot mark + wordmark + nav + actions, same bg as page, bottom hairline) · hero panel · card grid · footer | TerrariumMarket, lab home |
 
 Shell rules:
-- One shell that adapts by density — no parallel `/mobile/*` routes (the author retired those).
+- One shell that adapts by density; no parallel `/mobile/*` routes (we retired those).
 - The frame (rail, strip, header, status bar) is visually quieter and darker (light mode) than the canvas.
 - Only the content region scrolls; header/sidebar stay pinned. If the window never scrolls, restore scroll per route manually (router `scrollBehavior` cannot help).
 - Global overlays (palette, toasts, modals, shortcut help) mount once at the root.
@@ -33,7 +33,7 @@ Shell rules:
 
 - One reactive module-level signal: `compact < 768px ≤ regular < 1280px ≤ expansive`, plus a user override (`auto|compact|regular|expansive`) persisted and synced across tabs (`storage` event). Lazy-init so importing it has no side effects. A minimal version is `matchMedia("(max-width: 767px)")` as `useCompact()`.
 - CSS-only rules use the same breakpoint: `@media (max-width: 767px)` / `max-md:`.
-- Branch the **design**, not just the sizes: **phones get a different interaction model, not a squeezed desktop.**
+- Branch the design as well as the sizes: phones get their own interaction model instead of a squeezed desktop.
   - rail → drawer; tab strip → icon tabs or bottom tab bar
   - tables → tap rows → detail sheet/page
   - settings two-pane → list → page
@@ -41,7 +41,7 @@ Shell rules:
   - popovers → sheets/drawers; dialogs → fullscreen
   - keyboard hints hidden; Enter inserts a newline
   - a wide schematic keeps its drawing and scrolls sideways (`min-w-[860px]`) rather than reflowing into nonsense
-- Degrade **detail**, not text size: level-of-detail by zoom or by available space (full / brief / compact tiles; grouped previews when a box gets too small).
+- Reduce detail instead of text size: level-of-detail by zoom or by available space (full / brief / compact tiles; grouped previews when a box gets too small).
 - Two density presets in one system: **app chrome** (dense: `h-7`/`h-8` controls, 11px chips, 10px section labels, body 0.875rem) and **reading surfaces** (body 16px, 78ch measure, larger headings). The retune is deliberate; don't mix them in one view.
 
 ## Touch and phone rules
@@ -51,31 +51,32 @@ Shell rules:
 - Tap targets: ≥ 40px tall buttons, 40×40 icon buttons (`w-10 h-10` hamburger), `min-h-14` list rows.
 - `hover-only-action`: hover/focus-within reveals on desktop, always visible on touch, and the actions sit in normal flow (not absolutely positioned over a neighbour's tap area).
 - Long-press (500ms, cancelled by > 8px movement, pointer events) replaces right-click.
-- `html { touch-action: manipulation; -webkit-text-size-adjust: 100%; overflow-x: hidden }` — no double-tap zoom, no Android font boosting, no sideways page pan.
-- Do **not** set `user-scalable=no` / `maximum-scale=1` — pinch-zoom must keep working.
+- `html { touch-action: manipulation; -webkit-text-size-adjust: 100%; overflow-x: hidden }`; this stops double-tap zoom, Android font boosting and sideways page pan.
+- Do not set `user-scalable=no` / `maximum-scale=1`; pinch-zoom must keep working.
 - Safe areas: `padding-bottom: env(safe-area-inset-bottom)` on bottom bars and their popovers.
 - Soft keyboard: size dialog bodies with `dvh` (`max-height: calc(100dvh - 120px)`); track `visualViewport` if a composer must stay above the keyboard.
 - `:active` feedback on touch rows (`active:bg-warm-200/60`), since hover never fires.
-- No one-way traps: any mode switch (e.g. "desktop mode") must be undoable from the same screen.
+- Any mode switch (e.g. "desktop mode") must be undoable from the same screen.
 
 ## Overflow discipline
 
-Every element that can receive user data must survive long, unbroken, or wide content:
+Every element that can receive user data must handle long, unbroken or wide content:
 - `truncate` + `min-w-0` on flex children, `title` with the full value.
 - Wide markdown tables / KaTeX / code: `display:block; overflow-x:auto; max-width:100%` on the element itself.
 - Inline code and message text: `overflow-wrap: anywhere` (plus `word-break: break-word` for inline code).
 - Images in content: clamp (`max-width: min(65%, 42vw); max-height: 35vh`, or container units `65cqw / 50cqh`).
 - Centred rows that may overflow: `justify-content: safe center`.
 - Scoped scrollers only; horizontal tab strips get `overflow-x:auto` + `scrollbar-none`.
-- Figures wider than the reading column: break out with container-query units (`width: min(72rem, calc(100cqw - 4rem)); margin-left: 50%; transform: translateX(-50%)`) — `vw` ignores the sidebar.
+- Figures wider than the reading column: break out with container-query units (`width: min(72rem, calc(100cqw - 4rem)); margin-left: 50%; transform: translateX(-50%)`); `vw` ignores the sidebar.
 - Use a container query (`@container (max-width: 280px)`) when a component lives in panes of unknown width (it may also live in a webview).
 
 ## Flex/split layout pitfalls (learned from bugs)
 
-- Recursive split views: single root element per node (fragments break `h-full`/flex sizing — "the split has a hole"); no `min-h-0`/`min-w-0` on the %-sized split child; `flex flex-col` + `min-h-0` on the column that must let its child scroll.
-- Hooks that read a reused component's props take a **getter**, not a captured value (Vue reuses instances when a leaf becomes a split).
+- Recursive split views: single root element per node (fragments break `h-full`/flex sizing and leave a hole in the split); no `min-h-0`/`min-w-0` on the %-sized split child; `flex flex-col` + `min-h-0` on the column that must let its child scroll.
+- Hooks that read a reused component's props take a getter instead of a captured value (Vue reuses instances when a leaf becomes a split).
 - `content-visibility: auto` only on inner wrappers, never on roots that carry absolutely positioned children (paint containment clips them).
-- Size the app with an `html/body/#app { height: 100% }` chain, not `100vh`, so CSS zoom doesn't overflow.
+- Size an app shell with an `html/body/#app { height: 100% }` chain, not `100vh`, so CSS zoom doesn't overflow. `base.css` sets the first two; the shell sets `#app` and scrolls its own panes. A site or docs page leaves `#app` unsized and the window scrolls.
+- Guard sideways overflow with `overflow-x: clip` on `html` and `body`, not `hidden`. `hidden` on both makes `<body>` the scroll container, so `window.scrollY` stays 0 and router scroll restore, scroll-spy and `scrollTo()` stop working.
 
 ## Preferences and persistence
 

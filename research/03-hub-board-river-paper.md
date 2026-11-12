@@ -12,12 +12,10 @@ All paths below are relative to that root unless they are absolute.
 | River Doc | `KohakuRiver/src/kohakuriver-doc` | docs site framework | 2026-02-09/10 | `shiori` (5) |
 | Paper | `KohakuPaper/src/kohaku-paper-web` | OpenReview conference stats | 2025-11-28 (single commit) | Kohaku |
 
-**Authorship note (important for "his taste" vs. others):** `shiori` uses the
-same email as `KohakuBlueleaf` and `kblueleaf` (Board). It is Kohaku's own
-alias on another machine, so River Manager and River Doc count as his work. In KohakuHub,
+**Authorship note:** The `shiori` and `kblueleaf` (Board) commits belong to the KohakuBlueleaf account, so River Manager and River Doc are Kohaku's work. In KohakuHub,
 the April 2026 conventional-commit wave (`feat(ui/...)`, `test(ui/...)`, tar browser, `ErrorState.vue`,
-`http-errors.js`, the long `vite.config.js` `optimizeDeps` comment) was written by **a contributor
-(narugo1992)**, not Kohaku. Treat those parts as a contributor's style that Kohaku accepted, not as his own default.
+`http-errors.js`, the long `vite.config.js` `optimizeDeps` comment) was written by a contributor
+(narugo1992). Treat those parts as that contributor's style, merged into Hub, and not as Kohaku's default.
 
 Also: Board and Paper each ship as a single squashed commit, so they have no design history to mine.
 
@@ -184,7 +182,7 @@ The neutrals are Bootstrap greys (`#6c757d`, `#dee2e6`, `#adb5bd`), and dark mod
 - Hub Admin StatsCard: a solid gradient tile per color (`from-blue-500 to-blue-600` etc.), white `text-5xl font-bold` number, and `translateY(-4px)` on hover
   (`components/StatsCard.vue:38-46, 66-83`).
 
-River (late 2025/2026) and Terrarium have no gradient fills. Accents there are flat. Treat the gradients as an early habit he abandoned, not as current taste.
+River (late 2025/2026) and Terrarium have no gradient fills. Accents there are flat. The gradients are an early habit that was later dropped.
 
 ---
 

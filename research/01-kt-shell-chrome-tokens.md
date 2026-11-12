@@ -6,13 +6,13 @@ Git hashes come from the KohakuTerrarium repo (`git log` over style.css, uno.con
 
 Labels: **[STRONG]** = a rule that recurs across many files, or one a test enforces. **[ONE-OFF]** = local or inconsistent; do not generalize it.
 
-The parent has already summarized uno.config.js and style.css. This file covers only what those summaries leave out: how the tests enforce the rules, the surface model, shell structure, interaction conventions, and the reasons given in commits.
+uno.config.js and style.css are summarized elsewhere. This file covers how the tests enforce the rules, the surface model, shell structure, interaction conventions, and the reasons given in commits.
 
 ---
 
 ## 0. TL;DR principles (what to reproduce)
 
-1. **Tests guard the palette, not reviewers.** A vitest scan fails the build on any stock Tailwind colour, any off-palette rgb, or any gem shade that doesn't exist (`style.palette-guard.test.js`). The theme is also exported as CSS variables, and a second test keeps hard-coded fallbacks in sync with it (`style.gem-tokens.test.js`).
+1. **Tests enforce the palette.** A vitest scan fails the build on any stock Tailwind colour, any off-palette rgb, or any gem shade that doesn't exist (`style.palette-guard.test.js`). The theme is also exported as CSS variables, and a second test keeps hard-coded fallbacks in sync with it (`style.gem-tokens.test.js`).
 2. **Tokens are named by role, not by look.** Font sizes use `--kt-fs-micro…h1`, each named for what the text does. Surfaces use the v2 levels `chrome / canvas / panel / card / float`. Shell framing uses `--kt-shell-rail / -strip / -tab-active`.
 3. **The active tab takes the colour of the page under it.** Rail is darkest, strip is mid, and the active tab equals `--color-bg`, so the tab and its content read as one surface (`style.css:47-51`, `session-v2/surfaces.css:2-12,89-120`).
 4. **Density is one module-level signal.** It is `compact <768 / regular <1280 / expansive`, and the user can override it. The shell branches on it rather than on scattered media queries (`composables/useDensity.js`). CSS uses `(pointer: coarse)` for touch and `max-width: 767px` for dialogs, matching the same 768 threshold.
@@ -29,7 +29,7 @@ The parent has already summarized uno.config.js and style.css. This file covers 
 
 ### 1.1 `style.palette-guard.test.js` (introduced 012546b6, 2026-09-30) [STRONG]
 
-The test walks every `.vue/.js/.css` file under `src/` except `*.test.js`, `node_modules` and `locales`. It fails with a `file:line match (reason)` list. Banned patterns, with the reason string the author wrote for each:
+The test walks every `.vue/.js/.css` file under `src/` except `*.test.js`, `node_modules` and `locales`. It fails with a `file:line match (reason)` list. Banned patterns, with the reason string written for each:
 
 | Pattern | Reason (verbatim) |
 |---|---|
@@ -108,7 +108,7 @@ Technique: `:where()` keeps specificity at zero for the html part, so the rule t
 
 ### 2.2 v2 surface model, from `components/session-v2/surfaces.css` [STRONG in v2 and settings; this is the current direction]
 
-The author's own definition (lines 1-12):
+KohakuTerrarium's own definition (lines 1-12):
 > v2 surfaces. Five levels, each a job:
 > chrome — the session bar; equals the shell's active tab (warm-50 / warm-950), so that tab flows into the bar;
 > canvas — what a tab shows (chat, pages); the active session tab shares this color;
@@ -412,7 +412,7 @@ Flush happens after 1500ms idle, with a 10s max wait, and backs off on failure. 
 
 ---
 
-## 13. Explicit "don'ts" the author learned (consolidated)
+## 13. Explicit "don'ts" (consolidated)
 
 1. **Don't use stock Tailwind palette scales** (`text-red-500`, `bg-gray-100`, `stone-*`) or invented gem shades (`iolite-dark`). The test fails on them. Use gem `light/DEFAULT/shadow` + `warm-50..950` (palette guard; da92f6c9).
 2. **Don't hard-code hex or rgb in shared CSS.** Use `var(--kt-color-x, <exact theme hex>)` (gem-tokens test).

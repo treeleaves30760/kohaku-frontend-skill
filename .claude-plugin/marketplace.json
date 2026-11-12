@@ -1,6 +1,6 @@
 {
   "name": "kohaku-frontend-skill",
-  "description": "The Kohaku (KohakuBlueleaf / Kohaku-Lab) frontend design language as an installable skill.",
+  "description": "Frontend design language of Kohaku-Lab's projects, as an installable skill.",
   "owner": {
     "name": "treeleaves30760"
   },
